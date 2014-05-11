@@ -1,9 +1,4 @@
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
-#include <iostream>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <getopt.h>
+#include "imtools.hxx"
 
 
 static const char* g_program_name;
@@ -36,13 +31,6 @@ static const struct option g_long_options[] = {
   {0,         0,                 0,    0}
 };
 
-
-static int
-file_exists(const char *filename)
-{
-  struct stat st;
-  return (stat(filename, &st) == 0);
-}
 
 static void
 usage(bool is_error)
@@ -138,7 +126,7 @@ diff(const std::string& filename_old, const std::string& filename_new)
   highlightEdges(diff_img, out_img);
 
   if (g_verbose) {
-    if (file_exists(g_out_filename.c_str())) {
+    if (imtools::file_exists(g_out_filename.c_str())) {
       fprintf(stderr, "Warning: File %s will be overwritten\n", g_out_filename.c_str());
     }
     printf("* Writing to %s\n", g_out_filename.c_str());

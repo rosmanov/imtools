@@ -1,11 +1,9 @@
-set(LibOpenCV_EXTRA_PREFIXES /usr/local /usr /opt /opt/local "$ENV{HOME}")
-foreach(prefix ${LibOpenCV_EXTRA_PREFIXES})
+foreach(prefix IN ITEMS /usr/local /usr /opt /opt/local "$ENV{HOME}")
   list(APPEND LibOpenCV_INCLUDE_PATHS "${prefix}/include")
   list(APPEND LibOpenCV_LIB_PATHS "${prefix}/lib")
 endforeach()
 
 find_path(LIBOPENCV_INCLUDE_DIR opencv2/imgproc/imgproc.hpp PATHS ${LibOpenCV_INCLUDE_PATHS})
-
 find_library(LIBOPENCV_CORE_LIB NAMES opencv_core PATHS ${LibOpenCV_LIB_PATHS})
 find_library(LIBOPENCV_IMGPROC_LIB NAMES opencv_imgproc PATHS ${LibOpenCV_LIB_PATHS})
 find_library(LIBOPENCV_HIGHGUI_LIB NAMES opencv_highgui PATHS ${LibOpenCV_LIB_PATHS})
@@ -26,7 +24,6 @@ if (LIBOPENCV_HIGHGUI_LIB)
   message(STATUS "Found libopencv_highgui: ${LIBOPENCV_HIGHGUI_LIB}")
 endif (LIBOPENCV_HIGHGUI_LIB)
 
-
 mark_as_advanced(
   LIBOPENCV_CORE_LIB
   LIBOPENCV_IMGPROC_LIB
@@ -34,4 +31,3 @@ mark_as_advanced(
   LIBOPENCV_INCLUDE_DIR
   LIBOPENCV_LIBS
 )
-

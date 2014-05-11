@@ -1,18 +1,8 @@
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
-#include <iostream>
-#include <stdio.h>
-#include <sys/stat.h>
+#include "imtools.hxx"
 
 using namespace std;
 using namespace cv;
 
-static int
-file_exists(const char *filename)
-{
-  struct stat st;
-  return (stat(filename, &st) == 0);
-}
 
 static void
 usage(const char *program)
@@ -31,7 +21,7 @@ int main(int argc, const char *argv[])
   }
 
   for (int i = 1; i < 3; i++) {
-    if (!file_exists(argv[i])) {
+    if (!imtools::file_exists(argv[i])) {
       fprintf(stderr, "File %s doesn't exist\n", argv[i]);
       usage(argv[0]);
       return 1;

@@ -1,11 +1,5 @@
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
-#include <iostream>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <getopt.h>
 #include <vector>
-
+#include "imtools.hxx"
 
 static const char* g_program_name;
 
@@ -40,13 +34,6 @@ static const struct option long_options[] = {
   {0,          0,                 0,    0}
 };
 
-
-static int
-file_exists(const char *filename)
-{
-  struct stat st;
-  return (stat(filename, &st) == 0);
-}
 
 static void
 usage(bool is_error)
@@ -138,7 +125,7 @@ int main(int argc, char **argv)
 
       case 't':
         g_tpl_filename = optarg;
-        if (!file_exists(g_tpl_filename.c_str())) {
+        if (!imtools::file_exists(g_tpl_filename.c_str())) {
           fprintf(stderr, "File %s doesn't exist", g_tpl_filename.c_str());
           usage(true);
         }
@@ -165,7 +152,7 @@ int main(int argc, char **argv)
   if (optind < argc) {
     while (optind < argc) {
       const char *filename = argv[optind++];
-      if (!file_exists(filename)) {
+      if (!imtools::file_exists(filename)) {
         fprintf(stderr, "Error: image %s doesn't exist.\n", filename);
         break;
       }

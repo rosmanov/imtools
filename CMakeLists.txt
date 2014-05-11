@@ -22,10 +22,11 @@ ${LIBOPENCV_HIGHGUI_LIB}")
 
 set(LIBS ${LIBS} ${LIBOPENCV_LIBS})
 
+set(common_src src/imtools.cxx)
+
 include_directories(${LIBOPENCV_INCLUDE_DIR})
 
-set(executables imdiff impatch imtpl)
-foreach(exec_item IN ITEMS ${executables})
-  add_executable(${exec_item} src/${exec_item}.cxx)
+foreach(exec_item IN ITEMS imdiff impatch imtpl)
+  add_executable(${exec_item} src/${exec_item}.cxx ${common_src})
   target_link_libraries(${exec_item} ${LIBS})
 endforeach()
