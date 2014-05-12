@@ -7,19 +7,19 @@ static std::string g_out_filename;
 
 static bool g_verbose = false;
 
-static bool g_crop = false;
+// Minimum difference between old and new matrix elements specifying
+// whether element is considered to be modified.
+static const int g_modification_threshold = 42;
 
-static int g_kernel_size = 3;
-static int g_ratio = 3;
-static const int g_low_threshold = 10;
-static const int g_max_low_threshold = 100;
+static const double g_thresh = 20.;
+// g_max_thresh has effect with cv::THRESH_BINARY and cv::THRESH_BINARY_INV only.
+static const double g_max_thresh = 250.;
 
 static const char* usage_template = "Usage: %s OPTIONS old_image new_image\n\n"
 "Computes difference between two images of the same size.\n\n"
 " -h, --help           Display this help.\n"
 " -v, --verbose        Verbose mode.\n"
-" -o, --output         Filename of the output image. Required.\n"
-" -c, --crop           Crop output image up to rectangle with differences.\n";
+" -o, --output         Filename of the output image. Required.\n";
 
 static const char* g_short_options = "hvo:c";
 
@@ -27,7 +27,6 @@ static const struct option g_long_options[] = {
   {"help",    no_argument,       NULL, 'h'},
   {"verbose", no_argument,       NULL, 'v'},
   {"output",  required_argument, NULL, 'o'},
-  {"crop",    required_argument, NULL, 'c'},
   {0,         0,                 0,    0}
 };
 
@@ -40,90 +39,33 @@ usage(bool is_error)
 }
 
 static void
-highlightEdges(cv::Mat& img, cv::Mat& out)
-{
-  cv::Mat src_grey, detected_edges;
-
-  // Create matrix of the same size and type as img
-  out.create(img.size(), img.type());
-
-  // Convert to greyscale
-  cv::cvtColor(img, src_grey, CV_BGR2GRAY);
-
-  // Reduce noise with a kernel g_kernel_size x g_kernel_size
-  cv::blur(src_grey, detected_edges, cv::Size(g_kernel_size, g_kernel_size));
-
-  // Canny detector
-  cv::Canny(detected_edges, detected_edges, g_low_threshold, g_low_threshold * g_ratio, g_kernel_size);
-
-  out = cv::Scalar::all(0);
-
-  img.copyTo(out, detected_edges);
-}
-
-static void
-crop(cv::Mat& img) {
-  if (g_verbose) {
-    printf("* Cropping\n");
-  }
-
-  // Some isolated pixels distorting results.
-  //cv::Mat kernel = cv::Mat::ones(2, 2, CV_32F);
-  //cv::erode(img, img, kernel);
-  //cv::filter2D(img, img, -1, kernel, cv::Point(-1, -1), 0, cv::BORDER_DEFAULT);
-
-  int ev;
-  int min_i = img.rows - 1, max_i = 0, min_j = img.cols - 1, max_j = 0;
-
-  // Search for edges of the modified (non-zero) area
-
-  for (int i = 0; i < img.rows; i++) {
-    for (int j = 0; j < img.cols; j++) {
-      ev = img.at<int>(i, j);
-      //printf("%o ", ev);
-
-      if (ev == 0) {
-        continue;
-      }
-
-      if (i < min_i) {
-        min_i = i;
-      }
-      if (i > max_i) {
-        max_i = i;
-      }
-      if (j < min_j) {
-        min_j = j;
-      }
-      if (j > max_j) {
-        max_j = j;
-      }
-    }
-    //printf("\n");
-  }
-
-  if (g_verbose) {
-    printf("min_i: %d, max_i: %d, min_j: %d, max_j: %d\n",
-        min_i, max_i, min_j, max_j);
-  }
-}
-
-static void
 diff(const std::string& filename_old, const std::string& filename_new)
 {
-  cv::Mat diff_img, old_img, new_img;
+  cv::Mat diff_img, old_img, new_img, src_gray, out;
 
+  // Load images forcing them to be 3-channel
+  // (for converting to grayscale)
+  old_img = cv::imread(filename_old, 1);
+  new_img = cv::imread(filename_new, 1);
 
-  old_img = cv::imread(filename_old);
-  new_img = cv::imread(filename_new);
+  // Select likely modified pixels
+  diff_img = (old_img - new_img > g_modification_threshold);
 
-  // Select unequal pixels
-  diff_img = (old_img != new_img);
+  // Create matrix of the same size and type as diff_img
+  out.create(diff_img.size(), diff_img.type());
 
+  // Convert to greyscale
+  cv::cvtColor(diff_img, src_gray, CV_BGR2GRAY);
 
+  // Reduce values lower than g_thresh with THRESH_TOZERO:
+  // dst(x, y) = src(x, y) > g_thresh ? src(x, y) : 0
+  //cv::threshold(src_gray, out, 0, 255, cv::THRESH_TOZERO);
+  cv::threshold(src_gray, out, g_thresh, g_max_thresh, cv::THRESH_BINARY);
 
-  cv::Mat out_img;
-  highlightEdges(diff_img, out_img);
+  // Reduce noise
+  //cv::blur(out, out, cv::Size(3, 3));
+  //cv::medianBlur(out, out, 3);
+  //cv::GaussianBlur(out, out, cv::Size(3, 3), 10);
 
   if (g_verbose) {
     if (imtools::file_exists(g_out_filename.c_str())) {
@@ -132,12 +74,7 @@ diff(const std::string& filename_old, const std::string& filename_new)
     printf("* Writing to %s\n", g_out_filename.c_str());
   }
 
-  if (g_crop) {
-    crop(diff_img);
-  }
-
-
-  cv::imwrite(g_out_filename, out_img);
+  cv::imwrite(g_out_filename, out);
 }
 
 
@@ -163,10 +100,6 @@ int main(int argc, char** argv)
 
       case 'v':
         g_verbose = true;
-        break;
-
-      case 'c':
-        g_crop = true;
         break;
 
       case -1:

@@ -7,6 +7,8 @@
 #include <getopt.h>
 
 #include <sys/stat.h>
+#include <stdlib.h>
+#include <iostream>
 
 namespace imtools {
 

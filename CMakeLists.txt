@@ -26,7 +26,7 @@ set(common_src src/imtools.cxx)
 
 include_directories(${LIBOPENCV_INCLUDE_DIR})
 
-foreach(exec_item IN ITEMS imdiff impatch imtpl immerge)
+foreach(exec_item IN ITEMS imdiff impatch imtpl immerge imboundboxes)
   add_executable(${exec_item} src/${exec_item}.cxx ${common_src})
   target_link_libraries(${exec_item} ${LIBS})
 endforeach()
