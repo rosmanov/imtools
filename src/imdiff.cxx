@@ -7,6 +7,7 @@ static std::string g_out_filename;
 
 static bool g_verbose = false;
 
+
 // Minimum difference between old and new matrix elements specifying
 // whether element is considered to be modified.
 static int g_modification_threshold = 42;
@@ -26,13 +27,15 @@ const int IMTOOLS_BLUR = 1;
 const int IMTOOLS_BLUR_GAUSS = 2;
 const int IMTOOLS_BLUR_MEDIAN = 3;
 
+static int g_blur_type = IMTOOLS_BLUR_NONE;
+
 static const char* usage_template = "Usage: %s OPTIONS old_image new_image\n\n"
 "Computes difference between two images of the same size.\n\n"
 " -h, --help           Display this help.\n"
 " -v, --verbose        Verbose mode.\n"
 " -o, --output         Filename of the output image. Required.\n";
 
-static const char* g_short_options = "hvo";
+static const char* g_short_options = "hvo:";
 
 static const struct option g_long_options[] = {
   {"help",    no_argument,       NULL, 'h'},
@@ -78,6 +81,19 @@ thresh_callback(int, void*)
   //cv::threshold(g_src_gray, g_out, 0, 255, cv::THRESH_TOZERO);
   cv::threshold(g_src_gray, g_out, g_thresh, g_max_thresh, cv::THRESH_BINARY);
 
+  switch (g_blur_type) {
+    case IMTOOLS_BLUR:
+      cv::blur(g_out, g_out, cv::Size(3, 3));
+      break;
+
+    case IMTOOLS_BLUR_GAUSS:
+      cv::GaussianBlur(g_out, g_out, cv::Size(3, 3), 10);
+      break;
+
+    case IMTOOLS_BLUR_MEDIAN:
+      cv::medianBlur(g_out, g_out, 9);
+      break;
+  }
 
   // Show in a window
   cv::namedWindow(result_window_title, CV_WINDOW_AUTOSIZE);
@@ -91,26 +107,9 @@ blur_callback(int state, void *user_data)
     return;
   }
 
+  g_blur_type = *((int*)user_data);
+
   thresh_callback(0, 0);
-
-  int type = *((int*)user_data);
-
-  switch (type) {
-    case IMTOOLS_BLUR:
-      cv::blur(g_out, g_out, cv::Size(3, 3));
-      break;
-
-    case IMTOOLS_BLUR_GAUSS:
-      cv::GaussianBlur(g_out, g_out, cv::Size(3, 3), 10);
-      break;
-
-    case IMTOOLS_BLUR_MEDIAN:
-      cv::medianBlur(g_out, g_out, 3);
-      break;
-
-    default:
-      break;
-  }
 }
 
 static void
@@ -123,31 +122,21 @@ diff(const std::string& filename_old, const std::string& filename_new)
 
   // Create window
   const char* window_title = "Source";
-  cv::namedWindow(window_title, CV_WINDOW_AUTOSIZE);
-  cv::imshow(window_title, new_img);
+  cv::namedWindow(window_title, CV_WINDOW_NORMAL);
 
   cv::createButton("No blur", blur_callback, (void *) &IMTOOLS_BLUR_NONE, CV_RADIOBOX);
   cv::createButton("Blur", blur_callback, (void *) &IMTOOLS_BLUR, CV_RADIOBOX);
   cv::createButton("Gauss blur", blur_callback, (void *) &IMTOOLS_BLUR_GAUSS, CV_RADIOBOX);
+  cv::createButton("Median blur", blur_callback, (void *) &IMTOOLS_BLUR_MEDIAN, CV_RADIOBOX);
+
   cv::createTrackbar(" Mod Thresh:", window_title, &g_modification_threshold, g_max_modification_threshold, modification_thresh_callback);
   cv::createTrackbar(" Threshold:", window_title, &g_thresh, g_max_thresh, thresh_callback);
+
+  cv::imshow(window_title, new_img);
   thresh_callback(0, 0);
 
   cv::waitKey(0);
 
-#if 0
-  if (g_verbose) {
-    if (imtools::file_exists(g_out_filename.c_str())) {
-      fprintf(stderr, "Warning: File %s will be overwritten\n", g_out_filename.c_str());
-    }
-    printf("* Writing to %s\n", g_out_filename.c_str());
-  }
-  if (g_out_filename.length() == 0) {
-    fprintf(stderr, "Error: No output file specified.\n");
-    usage(true);
-  }
-  cv::imwrite(g_out_filename, g_out);
-#endif
 }
 
 
@@ -204,9 +193,21 @@ int main(int argc, char** argv)
 
   try {
     diff(filename_old, filename_new);
+
+	if (g_verbose) {
+		if (imtools::file_exists(g_out_filename.c_str())) {
+			fprintf(stderr, "Warning: File %s will be overwritten\n", g_out_filename.c_str());
+		}
+		printf("* Writing to %s\n", g_out_filename.c_str());
+	}
+	if (g_out_filename.length() == 0) {
+		fprintf(stderr, "Error: No output file specified.\n");
+		usage(true);
+	}
+	cv::imwrite(g_out_filename, g_out);
   } catch (cv::Exception& e) {
-    fprintf(stderr, "Error: %s\n", e.what());
-    return 1;
+	  fprintf(stderr, "Error: %s\n", e.what());
+	  return 1;
   }
 
   return 0;

@@ -29,14 +29,14 @@ int main(int argc, const char *argv[])
   }
 
   Mat img, tpl, result;
-  int match_method = CV_TM_CCOEFF; //CV_TM_SQDIFF;
+  int match_method = CV_TM_SQDIFF;
 
   img = imread(argv[1], 1);
   tpl = imread(argv[2], 1);
 
   // Convert both to grayscale
-  cv::cvtColor(img, img, CV_BGR2GRAY);
-  cv::cvtColor(tpl, tpl, CV_BGR2GRAY);
+  //cv::cvtColor(img, img, CV_BGR2GRAY);
+  //cv::cvtColor(tpl, tpl, CV_BGR2GRAY);
 
   int result_cols = img.cols - tpl.cols + 1;
   int result_rows = img.rows - tpl.rows + 1;

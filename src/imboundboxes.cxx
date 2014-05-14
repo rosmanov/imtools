@@ -56,14 +56,11 @@ main(int argc, char **argv)
           usage(false);
 
         case 's':
-          printf("step 1 %s\n", optarg);
           g_src_filename = optarg;
-          printf("step 2\n");
           if (!imtools::file_exists(g_src_filename.c_str())) {
             std::cerr << "File " << g_src_filename << " doesn't exist" << std::endl;
             usage(true);
           }
-          printf("step 3\n");
           g_src = cv::imread(g_src_filename);
           break;
 
@@ -111,10 +108,10 @@ main(int argc, char **argv)
 
     // Create window
     const char* window_title = "Source";
-    cv::namedWindow(window_title, CV_WINDOW_AUTOSIZE);
+    cv::namedWindow(window_title, CV_WINDOW_NORMAL);
     cv::imshow(window_title, g_mask);
 
-    cv::createTrackbar(" Threshold:", "Source", &g_thresh, g_max_thresh, thresh_callback);
+    cv::createTrackbar(" Threshold:", window_title, &g_thresh, g_max_thresh, thresh_callback);
     thresh_callback(0, 0);
 
     cv::waitKey(0);
@@ -149,17 +146,19 @@ thresh_callback(int, void*)
   }
 
   // Draw polygonal contour + bonding rects + circles
-  cv::Mat drawing = cv::Mat::zeros(threshold_output.size(), CV_8UC3);
+  cv::Mat drawing = g_src; //cv::Mat::zeros(threshold_output.size(), CV_8UC3);
   int square;
 
   for (int i = 0; i < contours.size(); ++i) {
     square = boundRect[i].width * boundRect[i].height;
     printf("Rect: x: %d y: %d width: %d height: %d square: %d\n",
         boundRect[i].x, boundRect[i].y, boundRect[i].width, boundRect[i].height, square);
+#if 0
     if (square < 128) {
       printf("Skipping rect.\n");
       continue;
     }
+#endif
 
     if (!g_src.empty()) {
       std::ostringstream osstr;
@@ -176,7 +175,8 @@ thresh_callback(int, void*)
   }
 
   // Show in a window
-  cv::namedWindow("Contours", CV_WINDOW_AUTOSIZE);
-  cv::imshow("Contours", drawing);
+  const char *contours_window_title = "Contours";
+  cv::namedWindow(contours_window_title, CV_WINDOW_AUTOSIZE);
+  cv::imshow(contours_window_title, drawing);
 }
 
