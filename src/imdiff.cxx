@@ -9,11 +9,22 @@ static bool g_verbose = false;
 
 // Minimum difference between old and new matrix elements specifying
 // whether element is considered to be modified.
-static const int g_modification_threshold = 42;
+static int g_modification_threshold = 42;
+static const int g_max_modification_threshold = 200;
 
-static const double g_thresh = 20.;
+static int g_thresh = 20;
 // g_max_thresh has effect with cv::THRESH_BINARY and cv::THRESH_BINARY_INV only.
-static const double g_max_thresh = 250.;
+static const int g_max_thresh = 255;
+
+static cv::Mat g_src_gray, g_out;
+static cv::Mat diff_img, old_img, new_img;
+
+const char *result_window_title = "Result";
+
+const int IMTOOLS_BLUR_NONE = 0;
+const int IMTOOLS_BLUR = 1;
+const int IMTOOLS_BLUR_GAUSS = 2;
+const int IMTOOLS_BLUR_MEDIAN = 3;
 
 static const char* usage_template = "Usage: %s OPTIONS old_image new_image\n\n"
 "Computes difference between two images of the same size.\n\n"
@@ -21,7 +32,7 @@ static const char* usage_template = "Usage: %s OPTIONS old_image new_image\n\n"
 " -v, --verbose        Verbose mode.\n"
 " -o, --output         Filename of the output image. Required.\n";
 
-static const char* g_short_options = "hvo:c";
+static const char* g_short_options = "hvo";
 
 static const struct option g_long_options[] = {
   {"help",    no_argument,       NULL, 'h'},
@@ -39,42 +50,104 @@ usage(bool is_error)
 }
 
 static void
+modification_thresh_callback(int, void*)
+{
+  // Select likely modified pixels.
+  // We try to something similar to command:
+  // compare old.jpg new.jpg -fuzz 25%  -compose Src -highlight-color White -lowlight-color Black diff.jpg
+  diff_img = (old_img - new_img > g_modification_threshold);
+
+  // Create matrix of the same size and type as diff_img
+  g_out.create(diff_img.size(), diff_img.type());
+
+  // Convert to greyscale
+  cv::cvtColor(diff_img, g_src_gray, CV_BGR2GRAY);
+
+  // Show in a window
+  cv::namedWindow(result_window_title, CV_WINDOW_AUTOSIZE);
+  cv::imshow(result_window_title, g_out);
+}
+
+static void
+thresh_callback(int, void*)
+{
+  modification_thresh_callback(0, 0);
+
+  // Reduce values lower than g_thresh with THRESH_TOZERO:
+  // dst(x, y) = src(x, y) > g_thresh ? src(x, y) : 0
+  //cv::threshold(g_src_gray, g_out, 0, 255, cv::THRESH_TOZERO);
+  cv::threshold(g_src_gray, g_out, g_thresh, g_max_thresh, cv::THRESH_BINARY);
+
+
+  // Show in a window
+  cv::namedWindow(result_window_title, CV_WINDOW_AUTOSIZE);
+  cv::imshow(result_window_title, g_out);
+}
+
+static void
+blur_callback(int state, void *user_data)
+{
+  if (state != 1) {
+    return;
+  }
+
+  thresh_callback(0, 0);
+
+  int type = *((int*)user_data);
+
+  switch (type) {
+    case IMTOOLS_BLUR:
+      cv::blur(g_out, g_out, cv::Size(3, 3));
+      break;
+
+    case IMTOOLS_BLUR_GAUSS:
+      cv::GaussianBlur(g_out, g_out, cv::Size(3, 3), 10);
+      break;
+
+    case IMTOOLS_BLUR_MEDIAN:
+      cv::medianBlur(g_out, g_out, 3);
+      break;
+
+    default:
+      break;
+  }
+}
+
+static void
 diff(const std::string& filename_old, const std::string& filename_new)
 {
-  cv::Mat diff_img, old_img, new_img, src_gray, out;
-
   // Load images forcing them to be 3-channel
   // (for converting to grayscale)
   old_img = cv::imread(filename_old, 1);
   new_img = cv::imread(filename_new, 1);
 
-  // Select likely modified pixels
-  diff_img = (old_img - new_img > g_modification_threshold);
+  // Create window
+  const char* window_title = "Source";
+  cv::namedWindow(window_title, CV_WINDOW_AUTOSIZE);
+  cv::imshow(window_title, new_img);
 
-  // Create matrix of the same size and type as diff_img
-  out.create(diff_img.size(), diff_img.type());
+  cv::createButton("No blur", blur_callback, (void *) &IMTOOLS_BLUR_NONE, CV_RADIOBOX);
+  cv::createButton("Blur", blur_callback, (void *) &IMTOOLS_BLUR, CV_RADIOBOX);
+  cv::createButton("Gauss blur", blur_callback, (void *) &IMTOOLS_BLUR_GAUSS, CV_RADIOBOX);
+  cv::createTrackbar(" Mod Thresh:", window_title, &g_modification_threshold, g_max_modification_threshold, modification_thresh_callback);
+  cv::createTrackbar(" Threshold:", window_title, &g_thresh, g_max_thresh, thresh_callback);
+  thresh_callback(0, 0);
 
-  // Convert to greyscale
-  cv::cvtColor(diff_img, src_gray, CV_BGR2GRAY);
+  cv::waitKey(0);
 
-  // Reduce values lower than g_thresh with THRESH_TOZERO:
-  // dst(x, y) = src(x, y) > g_thresh ? src(x, y) : 0
-  //cv::threshold(src_gray, out, 0, 255, cv::THRESH_TOZERO);
-  cv::threshold(src_gray, out, g_thresh, g_max_thresh, cv::THRESH_BINARY);
-
-  // Reduce noise
-  //cv::blur(out, out, cv::Size(3, 3));
-  //cv::medianBlur(out, out, 3);
-  //cv::GaussianBlur(out, out, cv::Size(3, 3), 10);
-
+#if 0
   if (g_verbose) {
     if (imtools::file_exists(g_out_filename.c_str())) {
       fprintf(stderr, "Warning: File %s will be overwritten\n", g_out_filename.c_str());
     }
     printf("* Writing to %s\n", g_out_filename.c_str());
   }
-
-  cv::imwrite(g_out_filename, out);
+  if (g_out_filename.length() == 0) {
+    fprintf(stderr, "Error: No output file specified.\n");
+    usage(true);
+  }
+  cv::imwrite(g_out_filename, g_out);
+#endif
 }
 
 
