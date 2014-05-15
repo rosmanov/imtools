@@ -22,7 +22,7 @@ static cv::Mat diff_img, old_img, new_img;
 
 const char *result_window_title = "Result";
 
-static imtools::blur_type g_blur_type = imtools::IMTOOLS_BLUR_NONE;
+static imtools::blur_type g_blur_type = imtools::BLUR_NONE;
 
 static const char* usage_template = "Usage: %s OPTIONS old_image new_image\n\n"
 "Computes difference between two images of the same size.\n\n"
@@ -62,7 +62,7 @@ thresh_callback(int, void*)
 
   imtools::threshold(g_out);
 
-  if (g_blur_type != imtools::IMTOOLS_BLUR_NONE) {
+  if (g_blur_type != imtools::BLUR_NONE) {
     imtools::blur(g_out, g_blur_type);
   }
 
@@ -93,10 +93,10 @@ show_diff(const std::string& filename_old, const std::string& filename_new)
 
   cv::namedWindow(window_title, CV_WINDOW_NORMAL);
 
-  cv::createButton("No blur",     blur_callback, (void *) imtools::IMTOOLS_BLUR_NONE,   CV_RADIOBOX);
-  cv::createButton("Blur",        blur_callback, (void *) imtools::IMTOOLS_BLUR,        CV_RADIOBOX);
-  cv::createButton("Gauss blur",  blur_callback, (void *) imtools::IMTOOLS_BLUR_GAUSS,  CV_RADIOBOX);
-  cv::createButton("Median blur", blur_callback, (void *) imtools::IMTOOLS_BLUR_MEDIAN, CV_RADIOBOX);
+  cv::createButton("No blur",     blur_callback, (void *) imtools::BLUR_NONE,   CV_RADIOBOX);
+  cv::createButton("Blur",        blur_callback, (void *) imtools::BLUR,        CV_RADIOBOX);
+  cv::createButton("Gauss blur",  blur_callback, (void *) imtools::BLUR_GAUSS,  CV_RADIOBOX);
+  cv::createButton("Median blur", blur_callback, (void *) imtools::BLUR_MEDIAN, CV_RADIOBOX);
 
   cv::createTrackbar(" Mod Thresh:", window_title, &g_modification_threshold, g_max_modification_threshold, modification_thresh_callback);
   cv::createTrackbar(" Threshold:",  window_title, &g_thresh,                 g_max_thresh,                 thresh_callback);

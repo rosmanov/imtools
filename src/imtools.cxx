@@ -28,18 +28,18 @@ void
 blur(cv::Mat& target, const blur_type type)
 {
   switch (type) {
-    case IMTOOLS_BLUR_NONE:
+    case BLUR_NONE:
       break;
 
-    case IMTOOLS_BLUR:
-      cv::blur(target, target, __kernel_3x3);
+    case BLUR:
+      cv::blur(target, target, cv::Size(3, 3));
       break;
 
-    case IMTOOLS_BLUR_GAUSS:
-      cv::GaussianBlur(target, target, __kernel_3x3, 10);
+    case BLUR_GAUSS:
+      cv::GaussianBlur(target, target, cv::Size(3, 3), 10);
       break;
 
-    case IMTOOLS_BLUR_MEDIAN:
+    case BLUR_MEDIAN:
       cv::medianBlur(target, target, 9);
       break;
 
@@ -111,26 +111,26 @@ patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const in
 }
 
 void
-bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask)
+bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask, int min_threshold, int max_threshold)
 {
   cv::Mat mask_gray, threshold_output;
   std::vector<std::vector<cv::Point> > contours;
   std::vector<cv::Vec4i> hierarchy;
-  int min_threshold = 3;
-  int max_threshold = 255;
+
+  assert(min_threshold >= 0 && min_threshold <= max_threshold);
 
   // Convert image to gray and blur it
-  printf("bound_boxes - 1, channels = %d\n", mask.channels());
+  debug_log("bound_boxes - 1, channels = %d\n", mask.channels());
   if (mask.channels() >= 3) {
     cv::cvtColor(mask, mask_gray, CV_BGR2GRAY);
   } else {
     mask_gray = mask;
   }
-  printf("bound_boxes - 2\n");
+  debug_log("bound_boxes - blur()\n");
   cv::blur(mask_gray, mask_gray, cv::Size(15, 15));
-  printf("bound_boxes - 3\n");
 
   // Detect edges
+  debug_log("bound_boxes - threshold(%d, %d)\n", min_threshold, max_threshold);
   cv::threshold(mask_gray, threshold_output, min_threshold, max_threshold, cv::THRESH_BINARY);
 
   cv::findContours(threshold_output, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
@@ -138,13 +138,13 @@ bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask)
   // Approximate contours to polygons, get bounding rects
   std::vector<std::vector<cv::Point> > contours_poly(contours.size());
   boxes.reserve(contours.size());
-  printf("bound_boxes - reserved %ld\n", contours.size());
+  debug_log("bound_boxes - reserved %ld\n", contours.size());
   for (int i = 0; i < contours.size(); ++i) {
     cv::approxPolyDP(cv::Mat(contours[i]), contours_poly[i], 3, true);
     boxes.push_back(cv::boundingRect(cv::Mat(contours_poly[i])));
-    printf("bound_boxes - boxes[i] = %d x %d\n", boxes[i].x, boxes[i].y);
+    debug_log("bound_boxes - boxes[i] = %d x %d\n", boxes[i].x, boxes[i].y);
   }
-  printf("bound_boxes - size = %ld\n", boxes.size());
+  debug_log("bound_boxes - size = %ld\n", boxes.size());
 }
 
 
