@@ -50,7 +50,7 @@ patch()
     fprintf(stderr, "Error: Failed to read template %s\n", g_tpl_filename.c_str());
     usage(true);
   }
-  int x2 = g_x + tpl_mat.cols, y2 = g_y + tpl_mat.cols;
+  int x2 = g_x + tpl_mat.cols, y2 = g_y + tpl_mat.rows;
   if (g_verbose) {
     printf("* Template rect. coords: %d %d %d %d\n", g_x, g_y, x2, y2);
   }
@@ -60,24 +60,10 @@ patch()
       printf("* Patching '%s'...\n", it->c_str());
     }
 
+    cv::Mat out_mat;
     cv::Mat img_mat = cv::imread(*it);
-    if (x2 > img_mat.rows || y2 > img_mat.cols) {
-      fprintf(stderr, "Warning: template is out of bounds %dx%d, skipping!\n", img_mat.cols, img_mat.rows);
-      img_mat.release();
-      continue;
-    }
 
-    // Region of interest (ROI)
-    cv::Rect roi = cv::Rect(g_x, g_y, tpl_mat.cols, tpl_mat.rows);
-
-    // Output matrix
-    cv::Mat out_mat = img_mat.clone();
-
-    // Extract ROI from the output image as a reference
-    cv::Mat out_mat_roi = out_mat(roi);
-
-    // Overwrite the ROI
-    tpl_mat.copyTo(out_mat_roi);
+    imtools::patch(out_mat, img_mat, tpl_mat, g_x, g_y);
 
     std::string out_filename = "out_" + g_tpl_filename;
     if (g_verbose) {

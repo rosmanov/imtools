@@ -16,13 +16,12 @@ static images_vector_t g_dst_images;
 static const char* usage_template = "Usage: %s OPTIONS [<image_1>[, <image_2>[, ...]]]\n\n"
 "Calculates difference between two images specified by --old-image and --new-image;\n"
 "applies the difference to <image_1>, <image_2> etc.\n"
-"Obviously, all images have to be identical.\n\n"
-"The tool can be useful to update a logo or some common element on a set of \"similar\" images.\n\n"
+"The tool can be useful to update a logo or some common elements on a set of \"similar\" images.\n\n"
 "OPTIONS:\n"
-"  -h, --help           Display this help.\n"
-"  -v, --verbose        Verbose mode.\n"
-"  -n, --new-image      New image.\n"
-"  -o, --old-image      Old image.\n";
+" -h, --help           Display this help.\n"
+" -v, --verbose        Verbose mode.\n"
+" -n, --new-image      New image.\n"
+" -o, --old-image      Old image.\n";
 
 static const char *short_options = "hvn:o:";
 
@@ -45,31 +44,68 @@ usage(bool is_error)
 static void
 merge()
 {
-  cv::Mat old_img, new_img, diff_img;
+  printf("merge()\n");
+  cv::Point match_loc;
+  cv::Mat out_img, old_img, new_img, diff_img, tpl_img;
   std::string merged_filename;
 
-  old_img = cv::imread(g_old_image_filename);
-  new_img = cv::imread(g_new_image_filename);
+  old_img = cv::imread(g_old_image_filename, 1);
+  new_img = cv::imread(g_new_image_filename, 1);
 
-  // Select unequal pixels
-  diff_img = (old_img != new_img);
+  printf("merge - 1\n");
+  imtools::diff(diff_img, old_img, new_img);
+  printf("merge - 2\n");
+  imtools::threshold(diff_img);
+  printf("merge - 3\n");
 
   g_dst_images.push_back(g_old_image_filename);
 
   for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it) {
-    old_img = cv::imread(*it);
+    if (g_verbose) {
+      printf("* Image %s ...\n", it->c_str());
+    }
+
+    old_img = cv::imread(*it, 1);
     if (old_img.empty()) {
       std::cerr << "Warning: skipping empty image: " << *it << std::endl;
       continue;
     }
 
-    new_img.copyTo(old_img, diff_img);
+    imtools::bound_box_vector_t boxes;
+    printf("merge - 4\n");
+    imtools::bound_boxes(boxes, diff_img);
+    printf("merge - 5, boxes.size() = %ld\n", boxes.size());
+
+
+    for (int i = 0; i < boxes.size(); i++) {
+      // Get tpl_img from original image using boxes[i] as a mask
+      tpl_img = cv::Mat(new_img, boxes[i]);
+
+      printf("match_template() - boxes[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
+      imtools::match_template(match_loc, old_img, tpl_img);
+
+      std::ostringstream osstr;
+      osstr << "rect" << i << ".jpg";
+      std::string rect_filename = osstr.str();
+      printf("* writing to %s\n", rect_filename.c_str());
+      cv::imwrite(rect_filename, tpl_img);
+
+      printf("patch() - %d\n", i);
+      imtools::patch(out_img, old_img, tpl_img, match_loc.x, match_loc.y);
+
+      osstr.clear();
+      osstr.str("");
+      osstr << "step" << i << ".jpg";
+      merged_filename = osstr.str();
+      std::cout << "* Writing to " << merged_filename << std::endl;
+      cv::imwrite(merged_filename, out_img);
+    }
 
     merged_filename = "merged_" + g_old_image_filename;
     if (g_verbose) {
       std::cout << "* Writing to " << merged_filename << std::endl;
     }
-    cv::imwrite(merged_filename, old_img);
+    cv::imwrite(merged_filename, out_img);
   }
 }
 
@@ -118,6 +154,7 @@ int main(int argc, char **argv)
   } while (next_option != -1);
 
   if (optind < argc) {
+    printf("%d < %d\n", optind, argc);
     while (optind < argc) {
       const char *filename = argv[optind++];
       if (!imtools::file_exists(filename)) {
@@ -126,6 +163,11 @@ int main(int argc, char **argv)
       }
       g_dst_images.push_back(filename);
     }
+  }
+
+  if (g_old_image_filename.length() == 0 || g_new_image_filename.length() == 0) {
+    fprintf(stderr, "Error: invalid input.\n");
+    usage(true);
   }
 
   try {

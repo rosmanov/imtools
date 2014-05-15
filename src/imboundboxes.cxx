@@ -2,8 +2,6 @@
 
 static const char* g_program_name;
 
-static bool g_verbose = false;
-
 static std::string g_src_filename;
 
 static std::string g_mask_filename;
@@ -12,14 +10,12 @@ static const char* usage_template = "Usage: %s OPTIONS <mask_filename>\n\n"
 "Outlines essential changes with bounding boxes. <mask_filename> is an image generated with imdiff tool.\n\n"
 "OPTIONS:\n"
 " -h, --help           Display this help.\n"
-" -v, --verbose        Verbose mode.\n"
 " -s, --source         Source image which will be used to generate parts corresponding to the bounding boxes.\n\n";
 
 static const char* g_short_options = "hvs:";
 
 static const struct option g_long_options[] = {
   {"help",    no_argument,       NULL, 'h'},
-  {"verbose", no_argument,       NULL, 'v'},
   {"source",  required_argument, NULL, 's'},
   {0,         0,                 0,    0}
 };
@@ -65,7 +61,6 @@ main(int argc, char **argv)
           break;
 
         case 'v':
-          g_verbose = true;
           break;
 
         case -1:
