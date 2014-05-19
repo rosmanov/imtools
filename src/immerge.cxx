@@ -152,6 +152,46 @@ load_images(const int argc, char** argv)
 }
 
 
+/// Thread routine) applying a bounding box to the output matrix.
+/// @note Is called directly, if there is no threads support.
+/// XXX mutex locking
+
+static void*
+apply_bounding_box(void* arg)
+{
+  imtools::patch_box_arg_t *pbarg;
+  cv::Mat                   old_tpl_img;
+  cv::Mat                   new_tpl_img;
+  cv::Point                 match_loc;
+
+  pbarg = (imtools::patch_box_arg_t *) arg;
+  assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
+
+  // Get a part of original image which had been changed
+  // using the next bounding box as a mask
+
+  old_tpl_img = cv::Mat(g_old_img, *pbarg->box);
+
+  // Find location on OLD_IMG which is similar to OLD_TPL_IMG
+
+  imtools::match_template(match_loc, *pbarg->old_img, old_tpl_img);
+
+  // Now get modified part corresponding to current box
+
+  new_tpl_img = cv::Mat(g_new_img, *pbarg->box);
+
+  // Copy NEW_TPL_IMG over the mask of the target matrix OLD_IMG
+  // at location (match_loc.x, match_loc.y).
+  // The result will be stored in OUT_IMG.
+
+  try {
+    imtools::patch(*pbarg->out_img, g_new_img, new_tpl_img, match_loc.x, match_loc.y);
+  } catch (imtools::template_out_of_bounds_exception& e) {
+    warning_log("%s, skipping!\n", e.what());
+  }
+}
+
+
 static inline void
 merge()
 {
@@ -198,32 +238,39 @@ merge()
 
     // Apply the bounding boxes
 
-    for (int i = 0; i < boxes.size(); i++) {
-      // Get a part of original image which had been changed
-      // using the next bounding box as a mask
+    int n_boxes = boxes.size();
+#ifdef IMTOOLS_THREADS
+    pthread_t thread_ids[n_boxes];
 
-      old_tpl_img = cv::Mat(g_old_img, boxes[i]);
+    for (int i = 0; i < n_boxes; i++) {
+      debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
 
-      // Find location on OLD_IMG which is similar to OLD_TPL_IMG
+      imtools::patch_box_arg_t pbarg;
+      pbarg.box = &boxes[i];
+      pbarg.old_img = &old_img;
+      pbarg.out_img = &out_img;
 
-      debug_log("match_template(), boxes[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
-      imtools::match_template(match_loc, old_img, old_tpl_img);
-
-      // Now get modified part corresponding to current box
-
-      new_tpl_img = cv::Mat(g_new_img, boxes[i]);
-
-      // Copy NEW_TPL_IMG over the mask of the target matrix OLD_IMG
-      // at location (match_loc.x, match_loc.y).
-      // The result will be stored in OUT_IMG.
-
-      try {
-        imtools::patch(out_img, g_new_img, new_tpl_img, match_loc.x, match_loc.y);
-      } catch (imtools::template_out_of_bounds_exception& e) {
-        warning_log("%s, skipping!\n", e.what());
-        //continue;
-      }
+      pthread_create(&thread_ids[i], NULL, apply_bounding_box, &pbarg);
     }
+
+    // Wait until threads are finished
+
+    for (int i = 0; i < n_boxes; i++) {
+      debug_log("joining thread #%ld\n", thread_ids[i]);
+      pthread_join(thread_ids[i], NULL);
+    }
+#else // no threads
+    for (int i = 0; i < n_boxes; i++) {
+      debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
+
+      imtools::patch_box_arg_t pbarg;
+      pbarg.box = &boxes[i];
+      pbarg.old_img = &old_img;
+      pbarg.out_img = &out_img;
+
+      apply_bounding_box(&pbarg);
+    }
+#endif // IMTOOLS_THREADS
 
     // Save merged matrix to filesystem
 
@@ -317,7 +364,6 @@ int main(int argc, char **argv)
     }
   } while (next_option != -1);
 
-
   debug_log("out-dir: %s\n", optarg);
   debug_log("mod-threshold: %d\n", g_mod_threshold);
   debug_log("min-threshold: %d\n", g_min_threshold);
@@ -329,16 +375,10 @@ int main(int argc, char **argv)
 
     // Load images into memory
 
-#ifdef IMTOOLS_DEBUG
-    struct timespec t1, t2;
-
-    clock_gettime(CLOCK_REALTIME, &t1);
+    debug_timer_init(t1, t2);
+    debug_timer_start(t1);
     load_images(argc, argv);
-    clock_gettime(CLOCK_REALTIME, &t2);
-    printf("load_images: %f sec\n", timespec_to_float(t2) - timespec_to_float(t1));
-#else
-    load_images(argc, argv);
-#endif
+    debug_timer_end(t1, t2, load_images());
 
     // Merge the difference into the target images
 

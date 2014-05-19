@@ -30,24 +30,9 @@
 #include <ctime>
 #include <unistd.h>
 
-#ifdef IMTOOLS_THREADS
-# include <pthread.h>
-#endif
+#include "threads.hxx"
+#include "log.hxx"
 
-
-#ifdef IMTOOLS_DEBUG
-# define debug_log(...) printf("Debug: " __VA_ARGS__)
-#else
-# define debug_log(...)
-#endif
-
-#define verbose_log(...)                            \
-  do {                                              \
-    if (imtools::verbose) printf("* " __VA_ARGS__); \
-  } while (0)
-
-#define error_log(...) fprintf(stderr, "!! Error: " __VA_ARGS__)
-#define warning_log(...) fprintf(stderr, "** Warning: " __VA_ARGS__)
 
 #define save_int_opt_arg(__arg, ...)         \
 {                                            \
@@ -59,29 +44,14 @@
   }                                          \
 }
 
-#ifdef IMTOOLS_DEBUG
-# define timespec_to_float(__t) ((double)((__t).tv_sec + (__t).tv_nsec * 1e-9))
-# define debug_timer_init(__t1, __t2) struct timespec __t1, __t2
-# define debug_timer_start(__t) clock_gettime(CLOCK_REALTIME, &(__t))
-# define debug_timer_end(__t1, __t2, __name)                                      \
-  do {                                                                            \
-    clock_gettime(CLOCK_REALTIME, &(__t2));                                       \
-    printf(# __name  ": %f sec\n", timespec_to_float(__t2) - timespec_to_float(__t1)); \
-  } while(0)
-#else
-# define debug_timer_init(__t1, __t2)
-# define timespec_to_float(__t)
-# define debug_timer_start(__t)
-# define debug_timer_end(__t1, __t2, __name)
-#endif
 
 namespace imtools {
 
 /// Verbose mode for CLI output
 extern bool verbose;
 
-typedef cv::Rect bound_box_vector_element_t;
-typedef std::vector<bound_box_vector_element_t> bound_box_vector_t;
+typedef cv::Rect bound_box_t;
+typedef std::vector<bound_box_t> bound_box_vector_t;
 
 enum blur_type {
   BLUR_NONE   = 0,
@@ -98,6 +68,11 @@ enum {
   THRESHOLD_BOXES_MAX = 255
 };
 
+struct patch_box_arg_t {
+  bound_box_t *box;
+  cv::Mat     *old_img;
+  cv::Mat     *out_img;
+};
 
 class template_out_of_bounds_exception: public std::runtime_error
 {
@@ -115,7 +90,6 @@ file_exists(const char *filename)
   struct stat st;
   return (stat(filename, &st) == 0);
 }
-
 
 // Computes difference between old_img and new_img. The matrix values lower than mod_threshold are
 // cut down to zeros. Result (1-channel binary image) is stored in out_img.
@@ -143,3 +117,4 @@ void bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask,
 } // namespace imtools
 
 #endif // IMTOOLS_HXX
+// vim: et ts=2 sts=2 sw=2
