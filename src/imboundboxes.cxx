@@ -54,7 +54,7 @@ main(int argc, char **argv)
         case 's':
           g_src_filename = optarg;
           if (!imtools::file_exists(g_src_filename.c_str())) {
-            std::cerr << "File " << g_src_filename << " doesn't exist" << std::endl;
+            fprintf(stderr, "File %s doesn't exist.", g_src_filename.c_str());
             usage(true);
           }
           g_src = cv::imread(g_src_filename);
@@ -72,7 +72,7 @@ main(int argc, char **argv)
           usage(true);
 
         default:
-          std::cerr << "Error: getopt returned character code 0" << std::oct << next_option << std::endl;
+          error_log("getopt returned character code 0%o\n", next_option);
           usage(true);
       }
     } while (next_option != -1);
@@ -81,18 +81,18 @@ main(int argc, char **argv)
       g_mask_filename = argv[optind++];
 
       if (!imtools::file_exists(g_mask_filename.c_str())) {
-        std::cerr << "Error: image " << g_mask_filename << " doesn't exist." << std::endl;
+        error_log("image %s doesn't exist.\n", g_mask_filename.c_str());
         usage(true);
       }
 
       // Load image, force 3 channels
       g_mask = cv::imread(g_mask_filename, 1);
       if (g_mask.empty()) {
-        std::cerr << "Error: image is empty" << std::endl;
+        error_log("image is empty.\n");
         usage(true);
       }
     } else {
-      std::cerr << "No mask image is specified.\n";
+      error_log("No mask image is specified.\n");
       usage(true);
     }
 
@@ -111,7 +111,7 @@ main(int argc, char **argv)
 
     cv::waitKey(0);
   } catch (cv::Exception& e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    fprintf(stderr, "%s", e.what());
     return 1;
   }
 
@@ -146,11 +146,11 @@ thresh_callback(int, void*)
 
   for (int i = 0; i < contours.size(); ++i) {
     square = boundRect[i].width * boundRect[i].height;
-    printf("Rect: x: %d y: %d width: %d height: %d square: %d\n",
+    printf("Rect: x: %d y: %d width: %d height: %d square: %d",
         boundRect[i].x, boundRect[i].y, boundRect[i].width, boundRect[i].height, square);
 #if 0
     if (square < 128) {
-      printf("Skipping rect.\n");
+      warning_log("Skipping rect.");
       continue;
     }
 #endif
@@ -160,7 +160,7 @@ thresh_callback(int, void*)
 
       osstr << "rect" << i << ".jpg";
       std::string filename = osstr.str();
-      printf("* Writing to %s\n", filename.c_str());
+      error_log("* Writing to %s\n", filename.c_str());
       cv::imwrite(filename, cv::Mat(g_src, boundRect[i]));
     }
 

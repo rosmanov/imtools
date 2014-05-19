@@ -5,8 +5,6 @@ static const char* g_program_name;
 
 static std::string g_out_filename;
 
-static bool g_verbose = false;
-
 
 // Minimum difference between old and new matrix elements specifying
 // whether element is considered to be modified.
@@ -129,7 +127,7 @@ int main(int argc, char** argv)
         break;
 
       case 'v':
-        g_verbose = true;
+        imtools::verbose = true;
         break;
 
       case -1:
@@ -149,9 +147,7 @@ int main(int argc, char** argv)
   if (argc - optind == 2) {
     filename_old = argv[optind++];
     filename_new = argv[optind++];
-    if (g_verbose) {
-      printf("* Old file: %s, new file: %s\n", filename_old.c_str(), filename_new.c_str());
-    }
+    verbose_log("Old file: %s, new file: %s\n", filename_old.c_str(), filename_new.c_str());
   } else {
     fprintf(stderr, "Error: Invalid input.\n");
     usage(true);
@@ -160,7 +156,7 @@ int main(int argc, char** argv)
   try {
     show_diff(filename_old, filename_new);
 
-    if (g_verbose) {
+    if (imtools::verbose) {
       if (imtools::file_exists(g_out_filename.c_str())) {
         fprintf(stderr, "Warning: File %s will be overwritten\n", g_out_filename.c_str());
       }

@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 
   for (int i = 1; i < 3; i++) {
     if (!imtools::file_exists(argv[i])) {
-      fprintf(stderr, "File %s doesn't exist\n", argv[i]);
+      error_log("File %s doesn't exist\n", argv[i]);
       usage(true);
       return 1;
     }

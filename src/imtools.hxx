@@ -1,42 +1,87 @@
+/* Copyright (C) 2014  Ruslan Osmanov <rrosmanov@gmail.com>
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ */
+
 #ifndef IMTOOLS_HXX
 #define IMTOOLS_HXX
 
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include <stdio.h>
-#include <getopt.h>
-
-#include <sys/stat.h>
 #include <stdlib.h>
-#include <iostream>
-
+#include <vector>
+#include <getopt.h>
+#include <sys/stat.h>
 #include <stdexcept>
-#include <stdint.h>
-
 #include <cassert>
 #include <cerrno>
+#include <ctime>
+#include <unistd.h>
+
+#ifdef IMTOOLS_THREADS
+# include <pthread.h>
+#endif
 
 
 #ifdef IMTOOLS_DEBUG
-# define debug_log( ... ) printf( "debug: " __VA_ARGS__ )
+# define debug_log(...) printf("Debug: " __VA_ARGS__)
 #else
-# define debug_log( ... )
+# define debug_log(...)
 #endif
 
-#define save_int_opt_arg( __arg, ... )       \
+#define verbose_log(...)                            \
+  do {                                              \
+    if (imtools::verbose) printf("* " __VA_ARGS__); \
+  } while (0)
+
+#define error_log(...) fprintf(stderr, "!! Error: " __VA_ARGS__)
+#define warning_log(...) fprintf(stderr, "** Warning: " __VA_ARGS__)
+
+#define save_int_opt_arg(__arg, ...)         \
 {                                            \
   char *optarg_end;                          \
   (__arg) = strtol(optarg, &optarg_end, 10); \
   if (*optarg_end != '\0' || (__arg) < 0) {  \
-    fprintf(stderr, __VA_ARGS__);            \
+    error_log(__VA_ARGS__);                  \
     usage(true);                             \
   }                                          \
 }
 
+#ifdef IMTOOLS_DEBUG
+# define timespec_to_float(__t) ((double)((__t).tv_sec + (__t).tv_nsec * 1e-9))
+# define debug_timer_init(__t1, __t2) struct timespec __t1, __t2
+# define debug_timer_start(__t) clock_gettime(CLOCK_REALTIME, &(__t))
+# define debug_timer_end(__t1, __t2, __name)                                      \
+  do {                                                                            \
+    clock_gettime(CLOCK_REALTIME, &(__t2));                                       \
+    printf(# __name  ": %f sec\n", timespec_to_float(__t2) - timespec_to_float(__t1)); \
+  } while(0)
+#else
+# define debug_timer_init(__t1, __t2)
+# define timespec_to_float(__t)
+# define debug_timer_start(__t)
+# define debug_timer_end(__t1, __t2, __name)
+#endif
 
 namespace imtools {
 
-typedef std::vector<cv::Rect> bound_box_vector_t;
+/// Verbose mode for CLI output
+extern bool verbose;
+
+typedef cv::Rect bound_box_vector_element_t;
+typedef std::vector<bound_box_vector_element_t> bound_box_vector_t;
 
 enum blur_type {
   BLUR_NONE   = 0,
@@ -46,31 +91,52 @@ enum blur_type {
 };
 
 enum {
-  THRESHOLD_MOD = 42,
-  THRESHOLD_MIN = 20,
-  THRESHOLD_MAX = 255,
-  THRESHOLD_BOXES_MIN = 3,
+  THRESHOLD_MOD       = 0, //42,
+  THRESHOLD_MIN       = 0, //20,
+  THRESHOLD_MAX       = 255,
+  THRESHOLD_BOXES_MIN = 0, //3,
   THRESHOLD_BOXES_MAX = 255
 };
 
-int file_exists(const char *filename);
+
+class template_out_of_bounds_exception: public std::runtime_error
+{
+  public:
+    template_out_of_bounds_exception(const char *msg)
+      : std::runtime_error(msg)
+    {
+    }
+};
+
+
+inline int
+file_exists(const char *filename)
+{
+  struct stat st;
+  return (stat(filename, &st) == 0);
+}
+
 
 // Computes difference between old_img and new_img. The matrix values lower than mod_threshold are
 // cut down to zeros. Result (1-channel binary image) is stored in out_img.
 void diff(cv::Mat& out_img, const cv::Mat& old_img, const cv::Mat& new_img,
     const int mod_threshold = THRESHOLD_MOD);
 
+/// Can be used to reduce noise
 void blur(cv::Mat& target, const blur_type type);
 
+/// Reduces noise
 void threshold(cv::Mat& target, const int threshold = THRESHOLD_MIN,
     const int max_threshold = THRESHOLD_MAX);
 
 void match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl);
 
+/// Patch IMG_MAT at position (X, Y) with contents of TPL_MAT.
+/// Result is stored in OUT_MAT. OUT_MAT must be of the same size and type as IMG_MAT.
 void patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat,
     const int x, const int y);
 
-// Find bounding boxes in mask (can be obtained with diff() + threshold())
+/// Find bounding boxes in mask (can be obtained with diff() + threshold())
 void bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask,
     int min_threshold = THRESHOLD_BOXES_MIN, int max_threshold = THRESHOLD_BOXES_MAX);
 
