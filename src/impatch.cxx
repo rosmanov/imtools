@@ -14,7 +14,8 @@ typedef std::vector<std::string> images_vector_t;
 static images_vector_t g_dst_images;
 
 
-static const char* usage_template = "Usage: %s OPTIONS <image_1>[, <image_2>[, ...]]\n\n"
+static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
+"Usage: %s OPTIONS <image_1>[, <image_2>[, ...]]\n\n"
 "Applies image template to <image_1>, <image_2> etc.\n\n"
 "OPTIONS:\n"
 "  -h, --help           Display this help.\n"

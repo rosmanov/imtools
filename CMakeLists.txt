@@ -3,26 +3,21 @@ project (ImTools CXX C)
 
 # -D IMTOOLS_DEBUG:STRING=OFF
 option(IMTOOLS_DEBUG "Enable debugging support in ImTools" OFF)
-# -D IMTOOLS_DIFF:STRING=OFF
-option(IMTOOLS_DIFF "Enable imdiff tool" OFF)
-# -D IMTOOLS_PATCH:STRING=OFF
-option(IMTOOLS_PATCH "Enable impatch tool" OFF)
-# -D IMTOOLS_TPL:STRING=OFF
-option(IMTOOLS_TPL "Enable imtpl tool" OFF)
-# -D IMTOOLS_BOUND_BOXES:STRING=OFF
-option(IMTOOLS_BOUND_BOXES "Enable imboundboxes tool" OFF)
 # -D IMTOOLS_THREADS:STRING=ON
 option(IMTOOLS_THREADS "Enable threading" ON)
+# -D IMTOOLS_EXTRA:STRING=OFF
+option(IMTOOLS_BOUND_BOXES "Enable extra tools" OFF)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
+include(ImToolsCompiler)
+
 find_package(LibOpenCV REQUIRED)
 
 if (IMTOOLS_DEBUG)
   set (CMAKE_BUILD_TYPE "Debug")
-  add_definitions(-DIMTOOLS_DEBUG -DWall -Dpedantic)
 else (IMTOOLS_DEBUG)
   set (CMAKE_BUILD_TYPE "Release")
 endif (IMTOOLS_DEBUG)
@@ -50,18 +45,9 @@ set(LIBS ${LIBS} ${LIBOPENCV_LIBS} ${THREADS_LIBRARIES})
 set(common_src src/imtools.cxx)
 
 set(tools_src immerge)
-if (IMTOOLS_DIFF)
-  set(tools_src ${tools_src} imdiff)
-endif (IMTOOLS_DIFF)
-if (IMTOOLS_PATCH)
-  set(tools_src ${tools_src} impatch)
-endif (IMTOOLS_PATCH)
-if (IMTOOLS_TPL)
-  set(tools_src ${tools_src} imtpl)
-endif (IMTOOLS_TPL)
-if (IMTOOLS_BOUND_BOXES)
-  set(tools_src ${tools_src} imboundboxes)
-endif (IMTOOLS_BOUND_BOXES)
+if (IMTOOLS_EXTRA)
+  set(tools_src ${tools_src} imdiff impatch imtpl imboundboxes)
+endif (IMTOOLS_EXTRA)
 
 include_directories(${LIBOPENCV_INCLUDE_DIR})
 

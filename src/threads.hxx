@@ -33,8 +33,9 @@
     pthread_mutex_init(&(mutex), &attr);                         \
   } while (0)
 # else // not linux or PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP is not defined
-#   define IT_MUTEX_CREATE(mutex) pthread_mutex_init (&(mutex), 0)
+#   define IT_MUTEX_CREATE(mutex) pthread_mutex_init(&(mutex), 0)
 # endif
+# define IT_MUTEX_DESTROY(mutex) pthread_mutex_destroy(&(mutex))
 
 # define IT_LOCK(mutex) pthread_mutex_lock(&(mutex))
 # define IT_UNLOCK(mutex) pthread_mutex_unlock(&(mutex))
@@ -45,8 +46,16 @@
 # define IT_COND_WAIT(cond,mutex) pthread_cond_wait (&(cond), &(mutex))
 # define IT_COND_TIMEDWAIT(cond,mutex,to) pthread_cond_timedwait (&(cond), &(mutex), &(to))
 
+# define IT_ATTR_INIT(pta)                                      \
+  do {                                                          \
+    pthread_attr_init(&pta);                                    \
+    pthread_attr_setdetachstate(&pta, PTHREAD_CREATE_JOINABLE); \
+  } while (0)
+# define IT_ATTR_DESTROY(pta) pthread_attr_destroy(&(pta))
+
 #else // no threads support
 #   define IT_MUTEX_CREATE(mutex)
+#   define IT_MUTEX_DESTROY(mutex)
 #   define IT_LOCK(mutex)
 #   define IT_UNLOCK(mutex)
 #   define IT_COND_INIT
@@ -54,6 +63,8 @@
 #   define IT_COND_SIGNAL(cond)
 #   define IT_COND_WAIT(cond,mutex)
 #   define IT_COND_TIMEDWAIT(cond,mutex,to)
+#   define IT_ATTR_INIT(attr)
+#   define IT_ATTR_DESTROY(pta)
 #endif
 
 #endif // IMTOOLS_THREADS_HXX

@@ -6,7 +6,8 @@ static std::string g_src_filename;
 
 static std::string g_mask_filename;
 
-static const char* usage_template = "Usage: %s OPTIONS <mask_filename>\n\n"
+static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
+"Usage: %s OPTIONS <mask_filename>\n\n"
 "Outlines essential changes with bounding boxes. <mask_filename> is an image generated with imdiff tool.\n\n"
 "OPTIONS:\n"
 " -h, --help           Display this help.\n"
@@ -135,7 +136,9 @@ thresh_callback(int, void*)
   std::vector<std::vector<cv::Point> > contours_poly(contours.size());
   std::vector<cv::Rect> boundRect(contours.size());
 
-  for (int i = 0; i < contours.size(); ++i) {
+  auto n_contours = contours.size();
+
+  for (size_t i = 0; i < n_contours; ++i) {
     cv::approxPolyDP(cv::Mat(contours[i]), contours_poly[i], 3, true);
     boundRect[i] = cv::boundingRect(cv::Mat(contours_poly[i]));
   }
@@ -144,7 +147,7 @@ thresh_callback(int, void*)
   cv::Mat drawing = g_src; //cv::Mat::zeros(threshold_output.size(), CV_8UC3);
   int square;
 
-  for (int i = 0; i < contours.size(); ++i) {
+  for (size_t i = 0; i < n_contours; ++i) {
     square = boundRect[i].width * boundRect[i].height;
     printf("Rect: x: %d y: %d width: %d height: %d square: %d",
         boundRect[i].x, boundRect[i].y, boundRect[i].width, boundRect[i].height, square);

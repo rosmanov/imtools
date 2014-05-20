@@ -5,7 +5,8 @@ using namespace cv;
 
 static const char* g_program_name;
 
-static const char* g_usage_template = "Usage: %s <original_image> <template_image>\n\n"
+static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
+"Usage: %s <original_image> <template_image>\n\n"
 "Outputs top left vertice coordinates of a rectangle within <original_image> which best matches <template_image>.\n\n"
 "<original_image> - Some full fledged image\n"
 "<template_image> - Some modified part of <original_image>\n";
@@ -14,7 +15,7 @@ static const char* g_usage_template = "Usage: %s <original_image> <template_imag
 static void
 usage(bool is_error)
 {
-  fprintf(is_error ? stdout : stderr, g_usage_template, g_program_name);
+  fprintf(is_error ? stdout : stderr, usage_template, g_program_name);
   exit(is_error ? 1 : 0);
 }
 

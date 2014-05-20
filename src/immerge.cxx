@@ -23,7 +23,7 @@
 #include "imtools.hxx"
 
 /// Max. number of target images
-#define IMTOOLS_MAX_MERGE_TARGETS 100
+const int IMTOOLS_MAX_MERGE_TARGETS = 100;
 
 static const char* g_program_name;
 
@@ -38,19 +38,24 @@ static std::string g_old_image_filename, g_new_image_filename, g_out_dir = ".";
 // Matrices for old and new images
 static cv::Mat g_old_img, g_new_img;
 
+#ifdef IMTOOLS_THREADS
+static pthread_mutex_t g_work_mutex;
+static pthread_mutex_t g_process_images_mutex;
+
+static pthread_attr_t g_pta;
+#endif
+
 // Destination images
 typedef std::vector<std::string> images_vector_t;
 static images_vector_t g_dst_images;
 
-static const char* usage_template =
-"\n\nCopyright (C) 2014 - Ruslan Osmanov <rrosmanov@gmail.com>\n\n"
+static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "A tool to compute difference between two images and apply the difference\n"
-"to a number of similar images by means of the OpenCV library.\n\n"
+"to a number of similar images by means of the OpenCV library.\n"
 "Usage: %s OPTIONS IMAGES\n\n"
 "Calculates difference between two images specified by --old-image and --new-image;\n"
 "applies the difference to IMAGES.\n"
-"The tool can be useful to update a logo or some common elements on a set of \"similar\" images.\n\n"
-"\n\n"
+"The tool can be useful to update a logo or some common elements on a set of \"similar\" images.\n"
 "Note: the bigger difference in quality the higher min. thresholds are required.\n\n"
 "IMAGES:\n"
 "Arguments specifying the target image paths.\n\n"
@@ -154,17 +159,16 @@ load_images(const int argc, char** argv)
 
 /// Thread routine) applying a bounding box to the output matrix.
 /// @note Is called directly, if there is no threads support.
-/// XXX mutex locking
 
 static void*
 apply_bounding_box(void* arg)
 {
-  imtools::patch_box_arg_t *pbarg;
+  imtools::box_arg_t *pbarg;
   cv::Mat                   old_tpl_img;
   cv::Mat                   new_tpl_img;
   cv::Point                 match_loc;
 
-  pbarg = (imtools::patch_box_arg_t *) arg;
+  pbarg = (imtools::box_arg_t *) arg;
   assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
 
   // Get a part of original image which had been changed
@@ -189,18 +193,105 @@ apply_bounding_box(void* arg)
   } catch (imtools::template_out_of_bounds_exception& e) {
     warning_log("%s, skipping!\n", e.what());
   }
+
+  return NULL;
 }
 
 
-static inline void
+static void
+process_image(std::string& filename, cv::Mat& diff_img)
+{
+  cv::Mat old_img, out_img, old_tpl_img, new_tpl_img;
+  std::string merged_filename;
+
+  verbose_log("Processing target: %s\n", filename.c_str());
+
+  // Load next target forcing 3 channels
+
+  old_img = cv::imread(filename, 1);
+  if (old_img.empty()) {
+    warning_log("skipping empty image: %s\n", filename.c_str());
+    return;
+  }
+
+  // Prepare matrix for current target image
+
+  out_img = old_img.clone();
+
+  // Generate rectangles bounding each cluster of changed pixels within DIFF_IMG.
+
+  imtools::bound_box_vector_t boxes;
+  imtools::bound_boxes(boxes, diff_img);
+  debug_log("boxes.size() = %ld\n", boxes.size());
+
+  // Apply the bounding boxes
+
+  int n_boxes = boxes.size();
+#if defined(IMTOOLS_THREADS)
+  auto pbarg = new imtools::box_arg_t[n_boxes];
+
+  for (int i = 0; i < n_boxes; i++) {
+    IT_LOCK(g_work_mutex);
+    debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
+
+    pbarg[i].box = &boxes[i];
+    pbarg[i].old_img = &old_img;
+    pbarg[i].out_img = &out_img;
+
+    debug_log("pbarg address: %p\n", static_cast<void*>(&pbarg[i]));
+    pthread_create(&pbarg[i].thread_id, &g_pta, apply_bounding_box, &pbarg[i]);
+    IT_UNLOCK(g_work_mutex);
+  }
+
+  // Wait until threads are finished
+
+  for (int i = 0; i < n_boxes; i++) {
+    debug_log("joining thread #%ld\n", pbarg[i].thread_id);
+    pthread_join(pbarg[i].thread_id, NULL);
+  }
+
+  delete [] pbarg;
+#else // no threads
+  for (int i = 0; i < n_boxes; i++) {
+    debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
+
+    imtools::box_arg_t pbarg;
+    pbarg.box = &boxes[i];
+    pbarg.old_img = &old_img;
+    pbarg.out_img = &out_img;
+
+    apply_bounding_box(&pbarg);
+  }
+#endif // IMTOOLS_THREADS
+
+  // Save merged matrix to filesystem
+
+  merged_filename = g_out_dir + "/" + filename;
+  verbose_log("Writing to %s\n", merged_filename.c_str());
+  cv::imwrite(merged_filename, out_img);
+}
+
+
+#ifdef IMTOOLS_THREADS
+static void*
+process_image_thread_func(void* arg)
+{
+  imtools::image_process_arg_t* ipa = (imtools::image_process_arg_t*)arg;
+
+  process_image(*ipa->filename, *ipa->diff_img);
+  return NULL;
+}
+#endif
+
+
+static void
 merge()
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
   cv::Point match_loc;
-  cv::Mat old_img, out_img, diff_img, old_tpl_img, new_tpl_img;
-  std::string merged_filename;
+  cv::Mat out_img, diff_img, old_tpl_img, new_tpl_img;
 
   // Compute difference between g_old_img and g_new_img
 
@@ -213,71 +304,40 @@ merge()
   imtools::threshold(diff_img, g_min_threshold, g_max_threshold);
   debug_timer_end(t1, t2, imtools::threshold);
 
+
   // Patch the target images
 
-  for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it) {
-    verbose_log("Processing target: %s\n", it->c_str());
+#if defined(IMTOOLS_THREADS)
+  int n_images = g_dst_images.size();
+  auto img_proc_args = new imtools::image_process_arg_t[n_images];
+  int i = 0;
 
-    // Load next target forcing 3 channels
+  for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it, ++i) {
+    IT_LOCK(g_process_images_mutex);
 
-    old_img = cv::imread(*it, 1);
-    if (old_img.empty()) {
-      warning_log("skipping empty image: %s\n", it->c_str());
-      continue;
-    }
+    img_proc_args[i].diff_img = &diff_img;
+    img_proc_args[i].filename = &*it;
 
-    // Prepare matrix for current target image
+    pthread_create(&img_proc_args[i].thread_id, &g_pta, process_image_thread_func, (void*)&img_proc_args[i]);
 
-    out_img = old_img.clone();
-
-    // Generate rectangles bounding each cluster of changed pixels within DIFF_IMG.
-
-    imtools::bound_box_vector_t boxes;
-    imtools::bound_boxes(boxes, diff_img);
-    debug_log("boxes.size() = %ld\n", boxes.size());
-
-    // Apply the bounding boxes
-
-    int n_boxes = boxes.size();
-#ifdef IMTOOLS_THREADS
-    pthread_t thread_ids[n_boxes];
-
-    for (int i = 0; i < n_boxes; i++) {
-      debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
-
-      imtools::patch_box_arg_t pbarg;
-      pbarg.box = &boxes[i];
-      pbarg.old_img = &old_img;
-      pbarg.out_img = &out_img;
-
-      pthread_create(&thread_ids[i], NULL, apply_bounding_box, &pbarg);
-    }
-
-    // Wait until threads are finished
-
-    for (int i = 0; i < n_boxes; i++) {
-      debug_log("joining thread #%ld\n", thread_ids[i]);
-      pthread_join(thread_ids[i], NULL);
-    }
-#else // no threads
-    for (int i = 0; i < n_boxes; i++) {
-      debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
-
-      imtools::patch_box_arg_t pbarg;
-      pbarg.box = &boxes[i];
-      pbarg.old_img = &old_img;
-      pbarg.out_img = &out_img;
-
-      apply_bounding_box(&pbarg);
-    }
-#endif // IMTOOLS_THREADS
-
-    // Save merged matrix to filesystem
-
-    merged_filename = g_out_dir + "/" + *it;
-    verbose_log("Writing to %s\n", merged_filename.c_str());
-    cv::imwrite(merged_filename, out_img);
+    IT_UNLOCK(g_process_images_mutex);
   }
+
+  assert(n_images == i);
+
+  // Wait for threads to finish
+
+  for (int i = 0; i < n_images; i++) {
+    debug_log("(images) joining thread #%ld\n", img_proc_args[i].thread_id);
+    pthread_join(img_proc_args[i].thread_id, NULL);
+  }
+
+  delete [] img_proc_args;
+#else // no threads
+  for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it) {
+    process_image(*it, diff_img);
+  }
+#endif // IMTOOLS_THREADS
 
   debug_timer_end(t1, t2, imtools::merge);
 }
@@ -288,6 +348,10 @@ int main(int argc, char **argv)
   int next_option;
 
   g_program_name = argv[0];
+
+#ifdef IMTOOLS_DEBUG
+  setvbuf(stdout, NULL, _IONBF, 0); // turn off buffering
+#endif
 
   // Parse CLI arguments
 
@@ -364,7 +428,7 @@ int main(int argc, char **argv)
     }
   } while (next_option != -1);
 
-  debug_log("out-dir: %s\n", optarg);
+  debug_log("out-dir: %s\n", g_out_dir.c_str());
   debug_log("mod-threshold: %d\n", g_mod_threshold);
   debug_log("min-threshold: %d\n", g_min_threshold);
   debug_log("max-threshold: %d\n", g_max_threshold);
@@ -380,9 +444,21 @@ int main(int argc, char **argv)
     load_images(argc, argv);
     debug_timer_end(t1, t2, load_images());
 
+    // Initialize threading
+
+    IT_ATTR_INIT(g_pta);
+    IT_MUTEX_CREATE(g_work_mutex);
+    IT_MUTEX_CREATE(g_process_images_mutex);
+
     // Merge the difference into the target images
 
     merge();
+
+    // Cleanup resources allocated for threading
+
+    IT_MUTEX_DESTROY(g_process_images_mutex);
+    IT_MUTEX_DESTROY(g_work_mutex);
+    IT_ATTR_DESTROY(g_pta);
 
     // Replace old image with the new one
 

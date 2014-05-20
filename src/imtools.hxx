@@ -33,6 +33,22 @@
 #include "threads.hxx"
 #include "log.hxx"
 
+#define IMTOOLS_VERSION "1.0.0"
+
+#ifdef IMTOOLS_DEBUG
+# define IMTOOLS_BUILD_TYPE "debug"
+#else
+# define IMTOOLS_BUILD_TYPE "release"
+#endif
+
+#ifdef IMTOOLS_THREADS
+# define IMTOOLS_SUFFIX "threaded"
+#else
+# define IMTOOLS_SUFFIX "non-threaded"
+#endif
+
+#define IMTOOLS_FULL_NAME "ImTools " IMTOOLS_VERSION " (" IMTOOLS_BUILD_TYPE ") (" IMTOOLS_SUFFIX ")"
+#define IMTOOLS_COPYRIGHT "Copyright (C) 2014 - Ruslan Osmanov <rrosmanov@gmail.com>"
 
 #define save_int_opt_arg(__arg, ...)         \
 {                                            \
@@ -68,10 +84,17 @@ enum {
   THRESHOLD_BOXES_MAX = 255
 };
 
-struct patch_box_arg_t {
+struct box_arg_t {
+  pthread_t    thread_id;
   bound_box_t *box;
   cv::Mat     *old_img;
   cv::Mat     *out_img;
+};
+
+struct image_process_arg_t {
+  pthread_t    thread_id;
+  std::string *filename;
+  cv::Mat     *diff_img;
 };
 
 class template_out_of_bounds_exception: public std::runtime_error

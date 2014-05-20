@@ -204,7 +204,7 @@ bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask, int min_threshold, i
   std::vector<std::vector<cv::Point> > contours_poly(contours.size());
   boxes.reserve(contours.size());
   debug_log("bound_boxes - reserved %ld\n", contours.size());
-  for (int i = 0; i < contours.size(); ++i) {
+  for (size_t i = 0; i < contours.size(); ++i) {
     cv::approxPolyDP(cv::Mat(contours[i]), contours_poly[i], 3, true);
     boxes.push_back(cv::boundingRect(cv::Mat(contours_poly[i])));
     debug_log("bound_boxes - boxes[i] = %dx%d\n", boxes[i].x, boxes[i].y);
