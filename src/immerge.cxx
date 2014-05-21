@@ -35,6 +35,8 @@ static int g_max_boxes_threshold = imtools::THRESHOLD_BOXES_MAX;
 
 static std::string g_old_image_filename, g_new_image_filename, g_out_dir = ".";
 
+static bool g_pairs = false;
+
 // Matrices for old and new images
 static cv::Mat g_old_img, g_new_img;
 
@@ -47,7 +49,7 @@ static pthread_attr_t g_pta;
 
 // Destination images
 typedef std::vector<std::string> images_vector_t;
-static images_vector_t g_dst_images;
+static images_vector_t g_dst_images, g_out_images;
 
 static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "A tool to compute difference between two images and apply the difference\n"
@@ -65,6 +67,8 @@ static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "
 " -n, --new-image            New image. Required.\n"
 " -o, --old-image            Old image. Required.\n"
 " -d, --out-dir              Output directory. Default: current directory.\n"
+" -p, --pairs                Interpret IMAGES as a list of input and output file pairs.\n"
+"                            If present, -d (--out-dir) has no effect.\n"
 " -m, --mod-threshold        Modification threshold. Default: %d\n"
 " -L, --min-threshold        Min. noise suppression threshold. Default: %d\n"
 " -H, --max-threshold        Max. noise suppression threshold. Default: %d\n"
@@ -73,7 +77,7 @@ static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "
 "EXAMPLE:\n"
 "%s -o old.png -n new.png -d/tmp old1.png old2.png\n";
 
-static const char *short_options = "hvn:o:d::m::L::H::b::B::";
+static const char *short_options = "hvn:o:d::p::m::L::H::b::B::";
 
 static const struct option long_options[] = {
   {"help",                no_argument,       NULL, 'h'},
@@ -81,6 +85,7 @@ static const struct option long_options[] = {
   {"new-image",           required_argument, NULL, 'n'},
   {"old-image",           required_argument, NULL, 'o'},
   {"out-dir",             optional_argument, NULL, 'd'},
+  {"pairs",               optional_argument, NULL, 'p'},
   {"mod-threshold",       optional_argument, NULL, 'm'},
   {"min-threshold",       optional_argument, NULL, 'L'},
   {"max-threshold",       optional_argument, NULL, 'H'},
@@ -110,28 +115,60 @@ usage(bool is_error)
 
 /// Loads images into memory
 
-static inline void
+static void
 load_images(const int argc, char** argv)
 {
   // Load target images
 
   if (optind < argc) {
-    for (int i = 1; optind < argc; ++i) {
-      if (i > IMTOOLS_MAX_MERGE_TARGETS) {
-        warning_log("max. number of targets exceeded: %d. Skipping the rest.\n", IMTOOLS_MAX_MERGE_TARGETS);
-        break;
+
+    if (g_pairs) { // IMAGES is a list of input and output files
+      for (int i = 0; optind < argc;) {
+        const char* filename = argv[optind++];
+
+        if (i++ % 2 == 0) {
+          if (i > IMTOOLS_MAX_MERGE_TARGETS) {
+            warning_log("max. number of targets exceeded: %d. Skipping the rest.\n", IMTOOLS_MAX_MERGE_TARGETS);
+            break;
+          }
+
+          // input file
+          if (!imtools::file_exists(filename)) {
+            warning_log("image %s doesn't exist.\n", filename);
+            break;
+          }
+          g_dst_images.push_back(filename);
+        } else {
+          // output file
+          g_out_images.push_back(filename);
+        }
       }
 
-      const char *filename = argv[optind++];
-      if (!imtools::file_exists(filename)) {
-        error_log("image %s doesn't exist.\n", filename);
-        break;
+      // Check if the number of input files matches the number of output files
+
+      if (g_dst_images.size() && g_dst_images.size() != g_out_images.size()) {
+        warning_log("%s file have no pair! Skipping.\n", g_dst_images.back().c_str());
+        g_dst_images.pop_back();
       }
-      g_dst_images.push_back(filename);
+      assert(g_dst_images.size() == g_out_images.size());
+    } else { // IMAGES is a list of output files
+      for (int i = 0; optind < argc; ++i) {
+        if (i >= IMTOOLS_MAX_MERGE_TARGETS) {
+          warning_log("max. number of targets exceeded: %d. Skipping the rest.\n", IMTOOLS_MAX_MERGE_TARGETS);
+          break;
+        }
+
+        const char *filename = argv[optind++];
+        if (!imtools::file_exists(filename)) {
+          error_log("image %s doesn't exist.\n", filename);
+          break;
+        }
+        g_dst_images.push_back(filename);
+      }
     }
   } else {
     error_log("Target image(s) expected. "
-        "You don't need this tool just to replace one image with another ;)");
+        "You don't need this tool just to replace one image with another ;)\n");
     usage(true);
   }
 
@@ -199,7 +236,7 @@ apply_bounding_box(void* arg)
 
 
 static void
-process_image(std::string& filename, cv::Mat& diff_img)
+process_image(std::string& filename, cv::Mat& diff_img, std::string* out_filename)
 {
   cv::Mat old_img, out_img, old_tpl_img, new_tpl_img;
   std::string merged_filename;
@@ -266,7 +303,7 @@ process_image(std::string& filename, cv::Mat& diff_img)
 
   // Save merged matrix to filesystem
 
-  merged_filename = g_out_dir + "/" + basename(filename.c_str());
+  merged_filename = out_filename ? (basename(out_filename->c_str())) : (g_out_dir + "/" + basename(filename.c_str()));
   verbose_log("Writing to %s\n", merged_filename.c_str());
   cv::imwrite(merged_filename, out_img);
 }
@@ -278,7 +315,7 @@ process_image_thread_func(void* arg)
 {
   imtools::image_process_arg_t* ipa = (imtools::image_process_arg_t*)arg;
 
-  process_image(*ipa->filename, *ipa->diff_img);
+  process_image(*ipa->filename, *ipa->diff_img, ipa->out_filename);
   return NULL;
 }
 #endif
@@ -317,6 +354,7 @@ merge()
 
     img_proc_args[i].diff_img = &diff_img;
     img_proc_args[i].filename = &*it;
+    img_proc_args[i].out_filename = g_pairs ? &g_out_images[i] : NULL;
 
     pthread_create(&img_proc_args[i].thread_id, &g_pta, process_image_thread_func, (void*)&img_proc_args[i]);
 
@@ -334,8 +372,9 @@ merge()
 
   delete [] img_proc_args;
 #else // no threads
-  for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it) {
-    process_image(*it, diff_img);
+  int i = 0;
+  for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it, ++i) {
+    process_image(*it, diff_img, (g_pairs ? &g_out_images[i] : NULL));
   }
 #endif // IMTOOLS_THREADS
 
@@ -412,6 +451,10 @@ int main(int argc, char **argv)
 
       case 'v':
         imtools::verbose = true;
+        break;
+
+      case 'p':
+        g_pairs = true;
         break;
 
       case -1:

@@ -94,6 +94,7 @@ struct box_arg_t {
 struct image_process_arg_t {
   pthread_t    thread_id;
   std::string *filename;
+  std::string *out_filename;
   cv::Mat     *diff_img;
 };
 
