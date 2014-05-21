@@ -266,7 +266,7 @@ process_image(std::string& filename, cv::Mat& diff_img)
 
   // Save merged matrix to filesystem
 
-  merged_filename = g_out_dir + "/" + filename;
+  merged_filename = g_out_dir + "/" + basename(filename.c_str());
   verbose_log("Writing to %s\n", merged_filename.c_str());
   cv::imwrite(merged_filename, out_img);
 }
@@ -463,7 +463,7 @@ int main(int argc, char **argv)
     // Replace old image with the new one
 
     std::string out_filename = g_out_dir + "/" + g_old_image_filename;
-    verbose_log("Replacing %s with %s\n", g_new_image_filename.c_str(), out_filename.c_str());
+    verbose_log("Copying %s to %s\n", g_new_image_filename.c_str(), out_filename.c_str());
     cv::imwrite(out_filename, g_new_img);
   } catch (cv::Exception& e) {
     error_log("CV error: %s\n", e.what());
