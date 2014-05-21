@@ -22,6 +22,7 @@
 
 #include "imtools.hxx"
 
+
 /// Max. number of target images
 const int IMTOOLS_MAX_MERGE_TARGETS = 100;
 
@@ -36,6 +37,7 @@ static int g_max_boxes_threshold = imtools::THRESHOLD_BOXES_MAX;
 static std::string g_old_image_filename, g_new_image_filename, g_out_dir = ".";
 
 static bool g_pairs = false;
+static bool g_strict = false;
 
 // Matrices for old and new images
 static cv::Mat g_old_img, g_new_img;
@@ -49,7 +51,7 @@ static pthread_attr_t g_pta;
 
 // Destination images
 typedef std::vector<std::string> images_vector_t;
-static images_vector_t g_dst_images, g_out_images;
+static images_vector_t g_dst_images, g_out_images, g_generated_files;
 
 static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "A tool to compute difference between two images and apply the difference\n"
@@ -64,6 +66,7 @@ static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "
 "OPTIONS:\n"
 " -h, --help                 Display this help.\n"
 " -v, --verbose              Turn on verbose output. Default: off.\n"
+" -s, --strict               Turn on warnings into errors. Default: off.\n"
 " -n, --new-image            New image. Required.\n"
 " -o, --old-image            Old image. Required.\n"
 " -d, --out-dir              Output directory. Default: current directory.\n"
@@ -77,15 +80,16 @@ static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "
 "EXAMPLE:\n"
 "%s -o old.png -n new.png -d/tmp old1.png old2.png\n";
 
-static const char *short_options = "hvn:o:d::p::m::L::H::b::B::";
+static const char *short_options = "hvsn:o:d::pm::L::H::b::B::";
 
 static const struct option long_options[] = {
   {"help",                no_argument,       NULL, 'h'},
   {"verbose",             no_argument,       NULL, 'v'},
+  {"strict",              no_argument,       NULL, 's'},
   {"new-image",           required_argument, NULL, 'n'},
   {"old-image",           required_argument, NULL, 'o'},
   {"out-dir",             optional_argument, NULL, 'd'},
-  {"pairs",               optional_argument, NULL, 'p'},
+  {"pairs",               no_argument,       NULL, 'p'},
   {"mod-threshold",       optional_argument, NULL, 'm'},
   {"min-threshold",       optional_argument, NULL, 'L'},
   {"max-threshold",       optional_argument, NULL, 'H'},
@@ -93,6 +97,24 @@ static const struct option long_options[] = {
   {"boxes-max-threshold", optional_argument, NULL, 'B'},
   {0,                     0,                 0,    0}
 };
+
+
+/// Cleanup generated files. Is called on error in strict mode
+
+static inline void
+cleanup_generated_data()
+{
+  verbose_log("Cleanup...\n");
+  if (g_strict && g_generated_files.size()) {
+    for (images_vector_t::iterator it = g_generated_files.begin(); it != g_generated_files.end(); ++it) {
+      const char* filename = (*it).c_str();
+      if (imtools::file_exists(filename)) {
+        verbose_log("Removing %s\n", filename);
+        unlink(filename);
+      }
+    }
+  }
+}
 
 
 /// Outputs help text to stdout or stderr depending on IS_ERROR, then exit()'s with
@@ -109,6 +131,9 @@ usage(bool is_error)
       imtools::THRESHOLD_BOXES_MIN,
       imtools::THRESHOLD_BOXES_MAX,
       g_program_name);
+
+  cleanup_generated_data();
+
   exit(is_error ? 1 : 0);
 }
 
@@ -128,13 +153,13 @@ load_images(const int argc, char** argv)
 
         if (i++ % 2 == 0) {
           if (i > IMTOOLS_MAX_MERGE_TARGETS) {
-            warning_log("max. number of targets exceeded: %d. Skipping the rest.\n", IMTOOLS_MAX_MERGE_TARGETS);
+            strict_log(g_strict, "max. number of targets exceeded: %d. Skipping the rest.\n", IMTOOLS_MAX_MERGE_TARGETS);
             break;
           }
 
           // input file
           if (!imtools::file_exists(filename)) {
-            warning_log("image %s doesn't exist.\n", filename);
+            strict_log(g_strict, "image %s doesn't exist.\n", filename);
             break;
           }
           g_dst_images.push_back(filename);
@@ -147,33 +172,33 @@ load_images(const int argc, char** argv)
       // Check if the number of input files matches the number of output files
 
       if (g_dst_images.size() && g_dst_images.size() != g_out_images.size()) {
-        warning_log("%s file have no pair! Skipping.\n", g_dst_images.back().c_str());
+        strict_log(g_strict, "%s file have no pair! Skipping.\n", g_dst_images.back().c_str());
         g_dst_images.pop_back();
       }
       assert(g_dst_images.size() == g_out_images.size());
     } else { // IMAGES is a list of output files
       for (int i = 0; optind < argc; ++i) {
         if (i >= IMTOOLS_MAX_MERGE_TARGETS) {
-          warning_log("max. number of targets exceeded: %d. Skipping the rest.\n", IMTOOLS_MAX_MERGE_TARGETS);
+          strict_log(g_strict, "max. number of targets exceeded: %d. Skipping the rest.\n", IMTOOLS_MAX_MERGE_TARGETS);
           break;
         }
 
         const char *filename = argv[optind++];
         if (!imtools::file_exists(filename)) {
-          error_log("image %s doesn't exist.\n", filename);
+          strict_log(g_strict, "image %s doesn't exist.\n", filename);
           break;
         }
         g_dst_images.push_back(filename);
       }
     }
   } else {
-    error_log("Target image(s) expected. "
+    strict_log(g_strict, "Target image(s) expected. "
         "You don't need this tool just to replace one image with another ;)\n");
     usage(true);
   }
 
   if (g_old_image_filename.length() == 0 || g_new_image_filename.length() == 0) {
-    error_log("expected non-empty image paths for comparison.\n");
+    strict_log(g_strict, "expected non-empty image paths for comparison.\n");
     usage(true);
   }
 
@@ -184,11 +209,11 @@ load_images(const int argc, char** argv)
   g_new_img = cv::imread(g_new_image_filename, 1);
 
   if (g_old_img.size() != g_new_img.size()) {
-    error_log("Input images have different dimensions.\n");
+    strict_log(g_strict, "Input images have different dimensions.\n");
     usage(true);
   }
   if (g_old_img.type() != g_new_img.type()) {
-    error_log("Input images have different types.\n");
+    strict_log(g_strict, "Input images have different types.\n");
     usage(true);
   }
 }
@@ -228,7 +253,7 @@ apply_bounding_box(void* arg)
   try {
     imtools::patch(*pbarg->out_img, g_new_img, new_tpl_img, match_loc.x, match_loc.y);
   } catch (imtools::template_out_of_bounds_exception& e) {
-    warning_log("%s, skipping!\n", e.what());
+    strict_log(g_strict, "%s, skipping!\n", e.what());
   }
 
   return NULL;
@@ -247,7 +272,7 @@ process_image(std::string& filename, cv::Mat& diff_img, std::string* out_filenam
 
   old_img = cv::imread(filename, 1);
   if (old_img.empty()) {
-    warning_log("skipping empty image: %s\n", filename.c_str());
+    strict_log(g_strict, "skipping empty image: %s\n", filename.c_str());
     return;
   }
 
@@ -305,6 +330,7 @@ process_image(std::string& filename, cv::Mat& diff_img, std::string* out_filenam
 
   merged_filename = out_filename ? (basename(out_filename->c_str())) : (g_out_dir + "/" + basename(filename.c_str()));
   verbose_log("Writing to %s\n", merged_filename.c_str());
+  if (g_strict) g_generated_files.push_back(merged_filename);
   cv::imwrite(merged_filename, out_img);
 }
 
@@ -404,7 +430,7 @@ int main(int argc, char **argv)
       case 'n':
       case 'o':
         if (!imtools::file_exists(optarg)) {
-          error_log("File %s doesn't exist", optarg);
+          strict_log(g_strict, "File %s doesn't exist", optarg);
           usage(true);
         }
         if (next_option == 'n') {
@@ -418,11 +444,11 @@ int main(int argc, char **argv)
         {
           struct stat st;
           if (stat(optarg, &st)) {
-            error_log("invalid output directory '%s', %s.\n", optarg, strerror(errno));
+            strict_log(g_strict, "invalid output directory '%s', %s.\n", optarg, strerror(errno));
             usage(true);
           }
           if (!S_ISDIR(st.st_mode)) {
-            error_log("%s is not a directory.\n", optarg);
+            strict_log(g_strict, "%s is not a directory.\n", optarg);
             usage(true);
           }
           g_out_dir = optarg;
@@ -457,6 +483,10 @@ int main(int argc, char **argv)
         g_pairs = true;
         break;
 
+      case 's':
+        g_strict = true;
+        break;
+
       case -1:
         // done with options
         break;
@@ -466,7 +496,7 @@ int main(int argc, char **argv)
         usage(true);
 
       default:
-        error_log("getopt returned character code 0%o\n", next_option);
+        strict_log(g_strict, "getopt returned character code 0%o\n", next_option);
         usage(true);
     }
   } while (next_option != -1);
@@ -509,10 +539,10 @@ int main(int argc, char **argv)
     verbose_log("Copying %s to %s\n", g_new_image_filename.c_str(), out_filename.c_str());
     cv::imwrite(out_filename, g_new_img);
   } catch (cv::Exception& e) {
-    error_log("CV error: %s\n", e.what());
+    strict_log(g_strict, "CV error: %s\n", e.what());
     return 1;
   } catch (std::exception& e) {
-    error_log("%s\n", e.what());
+    strict_log(g_strict, "%s\n", e.what());
     return 1;
   }
 

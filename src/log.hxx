@@ -31,6 +31,15 @@
 #define error_log(...) fprintf(stderr, "!! Error: " __VA_ARGS__)
 #define warning_log(...) fprintf(stderr, "** Warning: " __VA_ARGS__)
 
+#define strict_log(is_strict, ...) \
+  do {                             \
+    if ((is_strict)) {             \
+      error_log(__VA_ARGS__);      \
+      usage(true);                 \
+    } else                         \
+      warning_log(__VA_ARGS__);    \
+  } while(0)
+
 
 #ifdef IMTOOLS_DEBUG
 # define timespec_to_float(__t) ((double)((__t).tv_sec + (__t).tv_nsec * 1e-9))
