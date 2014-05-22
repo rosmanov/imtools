@@ -31,8 +31,14 @@ cv::Mat g_old_img;
 cv::Mat g_new_img;
 
 #ifdef IMTOOLS_THREADS
+// Whether some thread function failed
+// (we don't cancel threads in order to avoid possible memory leaks etc.)
+bool g_thread_failure = false;
+
 pthread_mutex_t g_work_mutex;
 pthread_mutex_t g_process_images_mutex;
+// Mutex for g_thread_failure variable
+pthread_mutex_t g_thread_failure_mutex;
 pthread_attr_t g_pta;
 #endif
 

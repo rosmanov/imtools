@@ -32,7 +32,7 @@ class ErrorException : public runtime_error
     ErrorException(): runtime_error(""), mMsg("") {}
     ErrorException(string msg) : runtime_error(""), mMsg(msg) {}
     virtual ~ErrorException() throw() { mMsg.clear(); }
-    const char* what() throw() { return mMsg.c_str(); }
+    /* virtual */ const char* what() throw() { return mMsg.c_str(); }
 
   protected:
     string mMsg;

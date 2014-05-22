@@ -29,7 +29,7 @@ using std::string;
 static void
 cleanup(bool is_error)
 {
-  verbose_log(">> Cleanup...\n");
+  verbose_log("Cleanup...\n");
 
   // Release resources allocated for threading
 
@@ -45,7 +45,7 @@ cleanup(bool is_error)
       for (images_vector_t::iterator it = g_generated_files.begin(); it != g_generated_files.end(); ++it) {
         const char* filename = (*it).c_str();
         if (file_exists(filename)) {
-          verbose_log("* Removing %s\n", filename);
+          verbose_log("Removing %s\n", filename);
           unlink(filename);
         }
       }
@@ -162,32 +162,54 @@ apply_bounding_box(void* arg)
   cv::Mat    new_tpl_img;
   cv::Point  match_loc;
 
+  IT_LOCK(g_thread_failure_mutex);
+  if (g_thread_failure) {
+    IT_UNLOCK(g_thread_failure_mutex);
+    return NULL;
+  }
+  IT_UNLOCK(g_thread_failure_mutex);
+
   pbarg = (box_arg_t *) arg;
   assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
 
-  // Get a part of original image which had been changed
-  // using the next bounding box as a mask
-
-  old_tpl_img = cv::Mat(g_old_img, *pbarg->box);
-
-  // Find location on OLD_IMG which is similar to OLD_TPL_IMG
-
-  match_template(match_loc, *pbarg->old_img, old_tpl_img);
-
-  // Now get modified part corresponding to current box
-
-  new_tpl_img = cv::Mat(g_new_img, *pbarg->box);
-
-  // Copy NEW_TPL_IMG over the mask of the target matrix OLD_IMG
-  // at location (match_loc.x, match_loc.y).
-  // The result will be stored in OUT_IMG.
-
   try {
+    // Get a part of original image which had been changed
+    // using the next bounding box as a mask
+
+    old_tpl_img = cv::Mat(g_old_img, *pbarg->box);
+
+    // Find location on OLD_IMG which is similar to OLD_TPL_IMG
+
+    match_template(match_loc, *pbarg->old_img, old_tpl_img);
+
+    // Now get modified part corresponding to current box
+
+    new_tpl_img = cv::Mat(g_new_img, *pbarg->box);
+
+    // Copy NEW_TPL_IMG over the mask of the target matrix OLD_IMG
+    // at location (match_loc.x, match_loc.y).
+    // The result will be stored in OUT_IMG.
+
     patch(*pbarg->out_img, g_new_img, new_tpl_img, match_loc.x, match_loc.y);
+
   } catch (TemplateOutOfBoundsException& e) {
-    strict_log(g_strict, "%s, skipping!\n", e.what());
+    IT_LOCK(g_thread_failure_mutex);
+    g_thread_failure = true;
+    IT_UNLOCK(g_thread_failure_mutex);
+
+    warning_log( "%s, skipping!\n", e.what());
+  } catch (ErrorException& e) {
+    IT_LOCK(g_thread_failure_mutex);
+    g_thread_failure = true;
+    IT_UNLOCK(g_thread_failure_mutex);
+
+    error_log("%s\n", e.what());
   } catch (...) {
-    throw imtools::ErrorException("Unknown error!\n");
+    IT_LOCK(g_thread_failure_mutex);
+    g_thread_failure = true;
+    IT_UNLOCK(g_thread_failure_mutex);
+
+    error_log("Caught unknown exception!\n");
   }
 
   return NULL;
@@ -281,7 +303,16 @@ process_image_thread_func(void* arg)
 {
   image_process_arg_t* ipa = (image_process_arg_t*)arg;
 
-  process_image(*ipa->filename, *ipa->diff_img, ipa->out_filename);
+  try {
+    process_image(*ipa->filename, *ipa->diff_img, ipa->out_filename);
+  } catch (ErrorException& e) {
+    error_log("%s\n", e.what());
+    IT_LOCK(g_thread_failure_mutex);
+    g_thread_failure = true;
+    IT_UNLOCK(g_thread_failure_mutex);
+    pthread_exit(NULL);
+  }
+
   return NULL;
 }
 #endif
@@ -484,6 +515,10 @@ int main(int argc, char **argv)
     exit_code = 1;
   } catch (...) {
     error_log("Unknown error!!! Please fail a bug.\n");
+    exit_code = 1;
+  }
+
+  if (g_strict && g_thread_failure) {
     exit_code = 1;
   }
 
