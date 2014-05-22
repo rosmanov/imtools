@@ -1,9 +1,33 @@
 # ImTools
 
-Some tools to work with images using the OpenCV library.
+Some tools for image manipulation by means of the *OpenCV* library.
 
-Currently all tools except `immerge` are designed for testing; `immerge` is a tool to
-detect modifications between two images and apply the changes to a number of
-similar images (all images should have similar contents).
+## Main tools
 
-For instance, `immerge` can be useful to update a logo on a number of images.
+### immerge
+
+A tool to compute difference between two images and apply the difference
+to a number of similar images.
+
+Can be useful to update a logo on a number of images.
+
+## Extra tools
+
+These are small programs created specially for testing functions declared in
+`src/imtools.hxx` header file.
+
+### imboundboxes
+
+Tests `imtools::bound_boxes()` function.
+
+### imdiff
+
+Tests `imtools::diff()` function.
+
+### immpatch
+
+Tests `imtools::patch()` function.
+
+### imtpl
+
+Tests `imtools::match_template()` function.
