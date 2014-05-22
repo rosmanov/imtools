@@ -35,9 +35,10 @@
   do {                             \
     if ((is_strict)) {             \
       error_log(__VA_ARGS__);      \
-      usage(true);                 \
-    } else                         \
+      throw ErrorException();      \
+    } else {                       \
       warning_log(__VA_ARGS__);    \
+    }                              \
   } while(0)
 
 

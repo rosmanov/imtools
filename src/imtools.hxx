@@ -32,8 +32,9 @@
 
 #include "threads.hxx"
 #include "log.hxx"
+#include "exceptions.hxx"
 
-#define IMTOOLS_VERSION "1.0.0"
+#define IMTOOLS_VERSION "1.0.1"
 
 #ifdef IMTOOLS_DEBUG
 # define IMTOOLS_BUILD_TYPE "debug"
@@ -66,8 +67,10 @@ namespace imtools {
 /// Verbose mode for CLI output
 extern bool verbose;
 
+typedef unsigned int uint_t;
 typedef cv::Rect bound_box_t;
 typedef std::vector<bound_box_t> bound_box_vector_t;
+typedef std::vector<std::string> images_vector_t;
 
 enum blur_type {
   BLUR_NONE   = 0,
@@ -98,22 +101,13 @@ struct image_process_arg_t {
   cv::Mat     *diff_img;
 };
 
-class template_out_of_bounds_exception: public std::runtime_error
-{
-  public:
-    template_out_of_bounds_exception(const char *msg)
-      : std::runtime_error(msg)
-    {
-    }
-};
-
-
-inline int
+inline bool
 file_exists(const char *filename)
 {
   struct stat st;
   return (stat(filename, &st) == 0);
 }
+
 
 // Computes difference between old_img and new_img. The matrix values lower than mod_threshold are
 // cut down to zeros. Result (1-channel binary image) is stored in out_img.

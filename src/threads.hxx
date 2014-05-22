@@ -40,12 +40,6 @@
 # define IT_LOCK(mutex) pthread_mutex_lock(&(mutex))
 # define IT_UNLOCK(mutex) pthread_mutex_unlock(&(mutex))
 
-# define IT_COND_INIT PTHREAD_COND_INITIALIZER
-# define IT_COND_CREATE(cond) pthread_cond_init(&(cond), 0)
-# define IT_COND_SIGNAL(cond) pthread_cond_signal(&(cond))
-# define IT_COND_WAIT(cond,mutex) pthread_cond_wait (&(cond), &(mutex))
-# define IT_COND_TIMEDWAIT(cond,mutex,to) pthread_cond_timedwait (&(cond), &(mutex), &(to))
-
 # define IT_ATTR_INIT(pta)                                      \
   do {                                                          \
     pthread_attr_init(&pta);                                    \
@@ -58,11 +52,6 @@
 #   define IT_MUTEX_DESTROY(mutex)
 #   define IT_LOCK(mutex)
 #   define IT_UNLOCK(mutex)
-#   define IT_COND_INIT
-#   define IT_COND_CREATE(cond)
-#   define IT_COND_SIGNAL(cond)
-#   define IT_COND_WAIT(cond,mutex)
-#   define IT_COND_TIMEDWAIT(cond,mutex,to)
 #   define IT_ATTR_INIT(attr)
 #   define IT_ATTR_DESTROY(pta)
 #endif

@@ -20,121 +20,53 @@
  * to a number of similar images by means of the OpenCV library.
  */
 
-#include "imtools.hxx"
+#include "immerge.hxx"
+
+using namespace imtools;
+using std::string;
 
 
-/// Max. number of target images
-const int IMTOOLS_MAX_MERGE_TARGETS = 100;
-
-static const char* g_program_name;
-
-static int g_mod_threshold       = imtools::THRESHOLD_MOD;
-static int g_min_threshold       = imtools::THRESHOLD_MIN;
-static int g_max_threshold       = imtools::THRESHOLD_MAX;
-static int g_min_boxes_threshold = imtools::THRESHOLD_BOXES_MIN;
-static int g_max_boxes_threshold = imtools::THRESHOLD_BOXES_MAX;
-
-static std::string g_old_image_filename, g_new_image_filename, g_out_dir = ".";
-
-static bool g_pairs = false;
-static bool g_strict = false;
-
-// Matrices for old and new images
-static cv::Mat g_old_img, g_new_img;
-
-#ifdef IMTOOLS_THREADS
-static pthread_mutex_t g_work_mutex;
-static pthread_mutex_t g_process_images_mutex;
-
-static pthread_attr_t g_pta;
-#endif
-
-// Destination images
-typedef std::vector<std::string> images_vector_t;
-static images_vector_t g_dst_images, g_out_images, g_generated_files;
-
-static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
-"A tool to compute difference between two images and apply the difference\n"
-"to a number of similar images by means of the OpenCV library.\n"
-"Usage: %s OPTIONS IMAGES\n\n"
-"Calculates difference between two images specified by --old-image and --new-image;\n"
-"applies the difference to IMAGES.\n"
-"The tool can be useful to update a logo or some common elements on a set of \"similar\" images.\n"
-"Note: the bigger difference in quality the higher min. thresholds are required.\n\n"
-"IMAGES:\n"
-"Arguments specifying the target image paths.\n\n"
-"OPTIONS:\n"
-" -h, --help                 Display this help.\n"
-" -v, --verbose              Turn on verbose output. Default: off.\n"
-" -s, --strict               Turn on warnings into errors. Default: off.\n"
-" -n, --new-image            New image. Required.\n"
-" -o, --old-image            Old image. Required.\n"
-" -d, --out-dir              Output directory. Default: current directory.\n"
-" -p, --pairs                Interpret IMAGES as a list of input and output file pairs.\n"
-"                            If present, -d (--out-dir) has no effect.\n"
-" -m, --mod-threshold        Modification threshold. Default: %d\n"
-" -L, --min-threshold        Min. noise suppression threshold. Default: %d\n"
-" -H, --max-threshold        Max. noise suppression threshold. Default: %d\n"
-" -b, --boxes-min-threshold  Min. threshold for bound boxes. Default: %d\n"
-" -B, --boxes-max-threshold  Max. threshold for bound boxes. Default: %d\n\n"
-"EXAMPLE:\n"
-"%s -o old.png -n new.png -d/tmp old1.png old2.png\n";
-
-static const char *short_options = "hvsn:o:d::pm::L::H::b::B::";
-
-static const struct option long_options[] = {
-  {"help",                no_argument,       NULL, 'h'},
-  {"verbose",             no_argument,       NULL, 'v'},
-  {"strict",              no_argument,       NULL, 's'},
-  {"new-image",           required_argument, NULL, 'n'},
-  {"old-image",           required_argument, NULL, 'o'},
-  {"out-dir",             optional_argument, NULL, 'd'},
-  {"pairs",               no_argument,       NULL, 'p'},
-  {"mod-threshold",       optional_argument, NULL, 'm'},
-  {"min-threshold",       optional_argument, NULL, 'L'},
-  {"max-threshold",       optional_argument, NULL, 'H'},
-  {"boxes-min-threshold", optional_argument, NULL, 'b'},
-  {"boxes-max-threshold", optional_argument, NULL, 'B'},
-  {0,                     0,                 0,    0}
-};
-
-
-/// Cleanup generated files. Is called on error in strict mode
-
-static inline void
-cleanup_generated_data()
+static void
+cleanup(bool is_error)
 {
-  verbose_log("Cleanup...\n");
-  if (g_strict && g_generated_files.size()) {
-    for (images_vector_t::iterator it = g_generated_files.begin(); it != g_generated_files.end(); ++it) {
-      const char* filename = (*it).c_str();
-      if (imtools::file_exists(filename)) {
-        verbose_log("Removing %s\n", filename);
-        unlink(filename);
+  verbose_log(">> Cleanup...\n");
+
+  // Release resources allocated for threading
+
+  IT_MUTEX_DESTROY(g_process_images_mutex);
+  IT_MUTEX_DESTROY(g_work_mutex);
+  IT_ATTR_DESTROY(g_pta);
+
+  // Strict mode cleanup
+
+  if (is_error && g_strict) {
+
+    if (g_generated_files.size()) {
+      for (images_vector_t::iterator it = g_generated_files.begin(); it != g_generated_files.end(); ++it) {
+        const char* filename = (*it).c_str();
+        if (file_exists(filename)) {
+          verbose_log("* Removing %s\n", filename);
+          unlink(filename);
+        }
       }
     }
   }
 }
 
 
-/// Outputs help text to stdout or stderr depending on IS_ERROR, then exit()'s with
-/// the status corresponding to the error state.
+/// Outputs help text to stdout or stderr depending on IS_ERROR
 
 static void
 usage(bool is_error)
 {
   fprintf(is_error ? stdout : stderr, usage_template,
       g_program_name,
-      imtools::THRESHOLD_MOD,
-      imtools::THRESHOLD_MIN,
-      imtools::THRESHOLD_MAX,
-      imtools::THRESHOLD_BOXES_MIN,
-      imtools::THRESHOLD_BOXES_MAX,
+      THRESHOLD_MOD,
+      THRESHOLD_MIN,
+      THRESHOLD_MAX,
+      THRESHOLD_BOXES_MIN,
+      THRESHOLD_BOXES_MAX,
       g_program_name);
-
-  cleanup_generated_data();
-
-  exit(is_error ? 1 : 0);
 }
 
 
@@ -158,7 +90,7 @@ load_images(const int argc, char** argv)
           }
 
           // input file
-          if (!imtools::file_exists(filename)) {
+          if (!file_exists(filename)) {
             strict_log(g_strict, "image %s doesn't exist.\n", filename);
             break;
           }
@@ -184,7 +116,7 @@ load_images(const int argc, char** argv)
         }
 
         const char *filename = argv[optind++];
-        if (!imtools::file_exists(filename)) {
+        if (!file_exists(filename)) {
           strict_log(g_strict, "image %s doesn't exist.\n", filename);
           break;
         }
@@ -225,12 +157,12 @@ load_images(const int argc, char** argv)
 static void*
 apply_bounding_box(void* arg)
 {
-  imtools::box_arg_t *pbarg;
-  cv::Mat                   old_tpl_img;
-  cv::Mat                   new_tpl_img;
-  cv::Point                 match_loc;
+  box_arg_t *pbarg;
+  cv::Mat    old_tpl_img;
+  cv::Mat    new_tpl_img;
+  cv::Point  match_loc;
 
-  pbarg = (imtools::box_arg_t *) arg;
+  pbarg = (box_arg_t *) arg;
   assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
 
   // Get a part of original image which had been changed
@@ -240,7 +172,7 @@ apply_bounding_box(void* arg)
 
   // Find location on OLD_IMG which is similar to OLD_TPL_IMG
 
-  imtools::match_template(match_loc, *pbarg->old_img, old_tpl_img);
+  match_template(match_loc, *pbarg->old_img, old_tpl_img);
 
   // Now get modified part corresponding to current box
 
@@ -251,9 +183,11 @@ apply_bounding_box(void* arg)
   // The result will be stored in OUT_IMG.
 
   try {
-    imtools::patch(*pbarg->out_img, g_new_img, new_tpl_img, match_loc.x, match_loc.y);
-  } catch (imtools::template_out_of_bounds_exception& e) {
+    patch(*pbarg->out_img, g_new_img, new_tpl_img, match_loc.x, match_loc.y);
+  } catch (TemplateOutOfBoundsException& e) {
     strict_log(g_strict, "%s, skipping!\n", e.what());
+  } catch (...) {
+    throw imtools::ErrorException("Unknown error!\n");
   }
 
   return NULL;
@@ -261,10 +195,10 @@ apply_bounding_box(void* arg)
 
 
 static void
-process_image(std::string& filename, cv::Mat& diff_img, std::string* out_filename)
+process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 {
   cv::Mat old_img, out_img, old_tpl_img, new_tpl_img;
-  std::string merged_filename;
+  string merged_filename;
 
   verbose_log("Processing target: %s\n", filename.c_str());
 
@@ -282,15 +216,15 @@ process_image(std::string& filename, cv::Mat& diff_img, std::string* out_filenam
 
   // Generate rectangles bounding each cluster of changed pixels within DIFF_IMG.
 
-  imtools::bound_box_vector_t boxes;
-  imtools::bound_boxes(boxes, diff_img);
+  bound_box_vector_t boxes;
+  bound_boxes(boxes, diff_img);
   debug_log("boxes.size() = %ld\n", boxes.size());
 
   // Apply the bounding boxes
 
   int n_boxes = boxes.size();
 #if defined(IMTOOLS_THREADS)
-  auto pbarg = new imtools::box_arg_t[n_boxes];
+  auto pbarg = new box_arg_t[n_boxes];
 
   for (int i = 0; i < n_boxes; i++) {
     IT_LOCK(g_work_mutex);
@@ -317,7 +251,7 @@ process_image(std::string& filename, cv::Mat& diff_img, std::string* out_filenam
   for (int i = 0; i < n_boxes; i++) {
     debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
 
-    imtools::box_arg_t pbarg;
+    box_arg_t pbarg;
     pbarg.box = &boxes[i];
     pbarg.old_img = &old_img;
     pbarg.out_img = &out_img;
@@ -328,10 +262,16 @@ process_image(std::string& filename, cv::Mat& diff_img, std::string* out_filenam
 
   // Save merged matrix to filesystem
 
-  merged_filename = out_filename ? (basename(out_filename->c_str())) : (g_out_dir + "/" + basename(filename.c_str()));
+  merged_filename = out_filename
+    ? out_filename->c_str()
+    : (g_out_dir + "/" + basename(filename.c_str()));
   verbose_log("Writing to %s\n", merged_filename.c_str());
-  if (g_strict) g_generated_files.push_back(merged_filename);
-  cv::imwrite(merged_filename, out_img);
+  if (g_strict) {
+    g_generated_files.push_back(merged_filename);
+  }
+  if (!cv::imwrite(merged_filename, out_img)) {
+    throw FileWriteErrorException(merged_filename);
+  }
 }
 
 
@@ -339,7 +279,7 @@ process_image(std::string& filename, cv::Mat& diff_img, std::string* out_filenam
 static void*
 process_image_thread_func(void* arg)
 {
-  imtools::image_process_arg_t* ipa = (imtools::image_process_arg_t*)arg;
+  image_process_arg_t* ipa = (image_process_arg_t*)arg;
 
   process_image(*ipa->filename, *ipa->diff_img, ipa->out_filename);
   return NULL;
@@ -358,21 +298,21 @@ merge()
 
   // Compute difference between g_old_img and g_new_img
 
-  imtools::diff(diff_img, g_old_img, g_new_img, g_mod_threshold);
-  debug_timer_end(t1, t2, imtools::diff);
+  diff(diff_img, g_old_img, g_new_img, g_mod_threshold);
+  debug_timer_end(t1, t2, diff);
 
   // Suppress noise
 
   debug_timer_start(t1);
-  imtools::threshold(diff_img, g_min_threshold, g_max_threshold);
-  debug_timer_end(t1, t2, imtools::threshold);
+  threshold(diff_img, g_min_threshold, g_max_threshold);
+  debug_timer_end(t1, t2, threshold);
 
 
   // Patch the target images
 
 #if defined(IMTOOLS_THREADS)
   int n_images = g_dst_images.size();
-  auto img_proc_args = new imtools::image_process_arg_t[n_images];
+  auto img_proc_args = new image_process_arg_t[n_images];
   int i = 0;
 
   for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it, ++i) {
@@ -404,13 +344,13 @@ merge()
   }
 #endif // IMTOOLS_THREADS
 
-  debug_timer_end(t1, t2, imtools::merge);
+  debug_timer_end(t1, t2, merge);
 }
 
 
 int main(int argc, char **argv)
 {
-  int next_option;
+  int next_option, exit_code = 0;
 
   g_program_name = argv[0];
 
@@ -421,15 +361,15 @@ int main(int argc, char **argv)
   // Parse CLI arguments
 
   do {
-    next_option = getopt_long(argc, argv, short_options, long_options, NULL);
+    next_option = getopt_long(argc, argv, g_short_options, g_long_options, NULL);
 
     switch (next_option) {
-     case 'h':
+      case 'h':
         usage(false);
 
       case 'n':
       case 'o':
-        if (!imtools::file_exists(optarg)) {
+        if (!file_exists(optarg)) {
           strict_log(g_strict, "File %s doesn't exist", optarg);
           usage(true);
         }
@@ -476,7 +416,7 @@ int main(int argc, char **argv)
         break;
 
       case 'v':
-        imtools::verbose = true;
+        verbose = true;
         break;
 
       case 'p':
@@ -508,8 +448,13 @@ int main(int argc, char **argv)
   debug_log("min-boxes-threshold: %d\n", g_min_boxes_threshold);
   debug_log("max-boxes-threshold: %d\n", g_max_boxes_threshold);
 
-  try {
+  // Initialize threading
 
+  IT_ATTR_INIT(g_pta);
+  IT_MUTEX_CREATE(g_work_mutex);
+  IT_MUTEX_CREATE(g_process_images_mutex);
+
+  try {
     // Load images into memory
 
     debug_timer_init(t1, t2);
@@ -517,36 +462,34 @@ int main(int argc, char **argv)
     load_images(argc, argv);
     debug_timer_end(t1, t2, load_images());
 
-    // Initialize threading
-
-    IT_ATTR_INIT(g_pta);
-    IT_MUTEX_CREATE(g_work_mutex);
-    IT_MUTEX_CREATE(g_process_images_mutex);
-
     // Merge the difference into the target images
 
     merge();
 
-    // Cleanup resources allocated for threading
+#if 0
+    // Copy new image
 
-    IT_MUTEX_DESTROY(g_process_images_mutex);
-    IT_MUTEX_DESTROY(g_work_mutex);
-    IT_ATTR_DESTROY(g_pta);
-
-    // Replace old image with the new one
-
-    std::string out_filename = g_out_dir + "/" + g_old_image_filename;
+    string out_filename = g_out_dir + "/" + g_old_image_filename;
     verbose_log("Copying %s to %s\n", g_new_image_filename.c_str(), out_filename.c_str());
-    cv::imwrite(out_filename, g_new_img);
+    if (!cv::imwrite(out_filename, g_new_img)) {
+      throw FileWriteErrorException(out_filename);
+    }
+#endif
+  } catch (imtools::ErrorException& e) {
+    error_log("%s\n", e.what());
+    usage(true);
+    exit_code = 1;
   } catch (cv::Exception& e) {
-    strict_log(g_strict, "CV error: %s\n", e.what());
-    return 1;
-  } catch (std::exception& e) {
-    strict_log(g_strict, "%s\n", e.what());
-    return 1;
+    error_log("CV error: %s\n", e.what());
+    exit_code = 1;
+  } catch (...) {
+    error_log("Unknown error!!! Please fail a bug.\n");
+    exit_code = 1;
   }
 
-  return 0;
+  cleanup(exit_code);
+
+  return exit_code;
 }
 
 // vim: et ts=2 sts=2 sw=2

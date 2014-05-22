@@ -140,19 +140,7 @@ patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const in
   if ((x + tpl_mat.cols) > out_mat.cols
       || (y + tpl_mat.rows) > out_mat.rows)
   {
-#ifdef IMTOOLS_DEBUG
-    std::ostringstream ostr;
-    ostr << "out_of_bounds_" << tpl_mat.cols << "x" << tpl_mat.rows << ".jpg";
-    debug_log("Template out of bounds, "
-        "tpl_mat.cols: %d, tpl_mat.rows: %d, "
-        "out_mat.cols: %d, out_mat.rows: %d, "
-        "saving to %s\n",
-        tpl_mat.cols, tpl_mat.rows,
-        out_mat.cols, out_mat.rows,
-        ostr.str().c_str());
-    cv::imwrite(ostr.str(), tpl_mat);
-#endif
-    throw template_out_of_bounds_exception("Template is out of bounds");
+    throw TemplateOutOfBoundsException(tpl_mat, out_mat, cv::Point(x, y));
   }
 
   // Region of interest
