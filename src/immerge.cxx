@@ -295,7 +295,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
   if (g_strict) {
     g_generated_files.push_back(merged_filename);
   }
-  if (!cv::imwrite(merged_filename, out_img)) {
+  if (!cv::imwrite(merged_filename, out_img, g_compression_params)) {
     throw FileWriteErrorException(merged_filename);
   }
 }
@@ -489,6 +489,17 @@ int main(int argc, char **argv)
   debug_log("min-boxes-threshold: %d\n", g_min_boxes_threshold);
   debug_log("max-boxes-threshold: %d\n", g_max_boxes_threshold);
 
+  // Setup compression parameters
+
+  g_compression_params.push_back(CV_IMWRITE_PNG_STRATEGY);
+  g_compression_params.push_back(cv::IMWRITE_PNG_STRATEGY_FILTERED);
+  g_compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
+  g_compression_params.push_back(9/* 0 -none,  9 - full */);
+#if 0
+  g_compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
+  g_compression_params.push_back(90);
+#endif
+
   // Initialize threading
 
   IT_ATTR_INIT(g_pta);
@@ -512,7 +523,7 @@ int main(int argc, char **argv)
 
     string out_filename = g_out_dir + "/" + g_old_image_filename;
     verbose_log("Copying %s to %s\n", g_new_image_filename.c_str(), out_filename.c_str());
-    if (!cv::imwrite(out_filename, g_new_img)) {
+    if (!cv::imwrite(out_filename, g_new_img, g_compression_params)) {
       throw FileWriteErrorException(out_filename);
     }
 #endif

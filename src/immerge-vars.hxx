@@ -47,6 +47,8 @@ images_vector_t g_dst_images;
 images_vector_t g_out_images;
 images_vector_t g_generated_files;
 
+std::vector<int> g_compression_params;
+
 const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "A tool to compute difference between two images and apply the difference\n"
 "to a number of similar images by means of the OpenCV library.\n"
