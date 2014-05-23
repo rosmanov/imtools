@@ -18,9 +18,11 @@
 #define IMTOOLS_LOG_HXX
 
 #ifdef IMTOOLS_DEBUG
-# define debug_log(...) printf("Debug: " __VA_ARGS__)
+# define debug_log0(__str) printf("[%ld] Debug: " __str, pthread_self())
+# define debug_log(__fmt, ...) printf("[%ld] Debug: " __fmt, pthread_self(), __VA_ARGS__)
 #else
-# define debug_log(...)
+# define debug_log0(__str)
+# define debug_log(__fmt, ...)
 #endif
 
 #define verbose_log(...)                            \
@@ -46,10 +48,11 @@
 # define timespec_to_float(__t) ((double)((__t).tv_sec + (__t).tv_nsec * 1e-9))
 # define debug_timer_init(__t1, __t2) struct timespec __t1, __t2
 # define debug_timer_start(__t) clock_gettime(CLOCK_REALTIME, &(__t))
-# define debug_timer_end(__t1, __t2, __name)                                           \
-  do {                                                                                 \
-    clock_gettime(CLOCK_REALTIME, &(__t2));                                            \
-    printf(# __name  ": %f sec\n", timespec_to_float(__t2) - timespec_to_float(__t1)); \
+# define debug_timer_end(__t1, __t2, __name)                                \
+  do {                                                                      \
+    clock_gettime(CLOCK_REALTIME, &(__t2));                                 \
+    printf("[%ld] Timer: " # __name  ": %f sec\n",                                  \
+        pthread_self(), timespec_to_float(__t2) - timespec_to_float(__t1)); \
   } while(0)
 #else
 # define debug_timer_init(__t1, __t2)

@@ -179,7 +179,7 @@ bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask, int min_threshold, i
   } else {
     mask_gray = mask;
   }
-  debug_log("bound_boxes: blur() w/ 15x15 kernel\n");
+  debug_log0("bound_boxes: blur() w/ 15x15 kernel\n");
   cv::blur(mask_gray, mask_gray, cv::Size(15, 15));
 
   // Detect edges
