@@ -1,3 +1,0 @@
-# TODO
-
-- Performance optimization
