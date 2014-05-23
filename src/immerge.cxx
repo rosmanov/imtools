@@ -127,11 +127,13 @@ load_images(const int argc, char** argv)
     strict_log(g_strict, "Target image(s) expected. "
         "You don't need this tool just to replace one image with another ;)\n");
     usage(true);
+    exit(1);
   }
 
   if (g_old_image_filename.length() == 0 || g_new_image_filename.length() == 0) {
     strict_log(g_strict, "expected non-empty image paths for comparison.\n");
     usage(true);
+    exit(1);
   }
 
   // Load the two images which will specify the modificatoin to be applied to each of g_dst_images;
@@ -143,10 +145,12 @@ load_images(const int argc, char** argv)
   if (g_old_img.size() != g_new_img.size()) {
     strict_log(g_strict, "Input images have different dimensions.\n");
     usage(true);
+    exit(1);
   }
   if (g_old_img.type() != g_new_img.type()) {
     strict_log(g_strict, "Input images have different types.\n");
     usage(true);
+    exit(1);
   }
 }
 
@@ -397,12 +401,14 @@ int main(int argc, char **argv)
     switch (next_option) {
       case 'h':
         usage(false);
+        exit(0);
 
       case 'n':
       case 'o':
         if (!file_exists(optarg)) {
           strict_log(g_strict, "File %s doesn't exist", optarg);
           usage(true);
+          exit(1);
         }
         if (next_option == 'n') {
           g_new_image_filename = optarg;
@@ -417,10 +423,12 @@ int main(int argc, char **argv)
           if (stat(optarg, &st)) {
             strict_log(g_strict, "invalid output directory '%s', %s.\n", optarg, strerror(errno));
             usage(true);
+            exit(1);
           }
           if (!S_ISDIR(st.st_mode)) {
             strict_log(g_strict, "%s is not a directory.\n", optarg);
             usage(true);
+            exit(1);
           }
           g_out_dir = optarg;
           break;
@@ -465,10 +473,12 @@ int main(int argc, char **argv)
       case '?':
         // unrecognized option
         usage(true);
+        exit(1);
 
       default:
         strict_log(g_strict, "getopt returned character code 0%o\n", next_option);
         usage(true);
+        exit(1);
     }
   } while (next_option != -1);
 
