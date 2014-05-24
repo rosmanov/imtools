@@ -30,5 +30,10 @@ src_configure() {
 	  $(cmake-utils_use_with extra)
 	)
 
+	if use debug; then
+		mycmakeargs+=( "-DIMTOOLS_DEBUG=ON" )
+		CMAKE_BUILD_TYPE="Debug"
+	fi
+
 	cmake-utils_src_configure
 }
