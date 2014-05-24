@@ -16,11 +16,13 @@ include(ImToolsCompiler)
 
 find_package(LibOpenCV REQUIRED)
 
-if (IMTOOLS_DEBUG)
+message (STATUS "Build type (pre): ${CMAKE_BUILD_TYPE}")
+message (STATUS "WITH_DEBUG: ${WITH_DEBUG}")
+if (IMTOOLS_DEBUG OR WITH_DEBUG)
   set (CMAKE_BUILD_TYPE "Debug")
-else (IMTOOLS_DEBUG)
+else (IMTOOLS_DEBUG OR WITH_DEBUG)
   set (CMAKE_BUILD_TYPE "Release")
-endif (IMTOOLS_DEBUG)
+endif (IMTOOLS_DEBUG OR WITH_DEBUG)
 message (STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 set(THREADS_LIBRARIES)
