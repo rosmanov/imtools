@@ -4,6 +4,8 @@ Some tools for image manipulation by means of the *OpenCV* library.
 
 ## Installation
 
+### Manual
+
 At the root of the project run:
 ```
 cmake [OPTIONS] . # <-- note the dot
@@ -16,6 +18,10 @@ make
 - `-DIMTOOLS_EXTRA=ON|OFF` - whether to build extra tools. Default: OFF.
 
 As a result, `bin` directory will contain the binaries.
+
+### Gentoo
+
+See `imtools-9999.ebuild` file at the root of the project.
 
 ## Main tools
 
