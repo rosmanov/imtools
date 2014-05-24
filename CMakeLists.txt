@@ -44,14 +44,16 @@ set(LIBS ${LIBS} ${LIBOPENCV_LIBS} ${THREADS_LIBRARIES})
 
 set(common_src src/imtools.cxx src/exceptions.cxx)
 
-set(tools_src immerge)
+set(imtools_targets immerge)
 if (IMTOOLS_EXTRA)
-  set(tools_src ${tools_src} imdiff impatch imtpl imboundboxes)
+  set(imtools_targets ${imtools_targets} imdiff impatch imtpl imboundboxes)
 endif (IMTOOLS_EXTRA)
 
 include_directories(${LIBOPENCV_INCLUDE_DIR})
 
-foreach(exec_item IN ITEMS ${tools_src})
+foreach(exec_item IN ITEMS ${imtools_targets})
   add_executable(${exec_item} src/${exec_item}.cxx ${common_src})
   target_link_libraries(${exec_item} ${LIBS})
 endforeach()
+
+install(TARGETS ${imtools_targets} DESTINATION "bin")
