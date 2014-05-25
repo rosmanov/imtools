@@ -8,3 +8,6 @@ images
 *.jpg
 *.png
 *.gif
+*.gcov
+*.out
+*.log
