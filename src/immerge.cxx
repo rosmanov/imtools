@@ -246,7 +246,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
   bound_boxes(boxes, diff_img);
 
   int n_boxes = boxes.size();
-  debug_log("boxes.size() = %ld\n", n_boxes);
+  debug_log("boxes.size() = %d\n", n_boxes);
 
   // Apply the bounding boxes
 

@@ -18,8 +18,8 @@
 #define IMTOOLS_LOG_HXX
 
 #ifdef IMTOOLS_DEBUG
-# define debug_log0(__str) printf("[%ld] Debug: " __str, pthread_self())
-# define debug_log(__fmt, ...) printf("[%ld] Debug: " __fmt, pthread_self(), __VA_ARGS__)
+# define debug_log0(__str) printf("[%lu] Debug: " __str, pthread_self())
+# define debug_log(__fmt, ...) printf("[%lu] Debug: " __fmt, pthread_self(), __VA_ARGS__)
 #else
 # define debug_log0(__str)
 # define debug_log(__fmt, ...)
