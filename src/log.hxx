@@ -18,8 +18,8 @@
 #define IMTOOLS_LOG_HXX
 
 #ifdef IMTOOLS_DEBUG
-# define debug_log0(__str) printf("[%lu] Debug: " __str, pthread_self())
-# define debug_log(__fmt, ...) printf("[%lu] Debug: " __fmt, pthread_self(), __VA_ARGS__)
+# define debug_log0(__str) printf("[Debug] [%lu] " __str, pthread_self())
+# define debug_log(__fmt, ...) printf("[Debug] [%lu] " __fmt, pthread_self(), __VA_ARGS__)
 #else
 # define debug_log0(__str)
 # define debug_log(__fmt, ...)
@@ -34,8 +34,8 @@
     if (imtools::verbose > 1) printf("v2: " __VA_ARGS__); \
   } while (0)
 
-#define error_log(...) fprintf(stderr, "!! Error: " __VA_ARGS__)
-#define warning_log(...) fprintf(stderr, "** Warning: " __VA_ARGS__)
+#define error_log(...) fprintf(stderr, "[Error] " __VA_ARGS__)
+#define warning_log(...) fprintf(stderr, "[Warning] " __VA_ARGS__)
 
 #define strict_log(is_strict, ...) \
   do {                             \

@@ -144,12 +144,10 @@ load_images(const int argc, char** argv)
 
   if (g_old_img.size() != g_new_img.size()) {
     strict_log(g_strict, "Input images have different dimensions.\n");
-    usage(true);
     exit(1);
   }
   if (g_old_img.type() != g_new_img.type()) {
     strict_log(g_strict, "Input images have different types.\n");
-    usage(true);
     exit(1);
   }
 }
@@ -541,7 +539,6 @@ int main(int argc, char **argv)
 #endif
   } catch (imtools::ErrorException& e) {
     error_log("%s\n", e.what());
-    usage(true);
     exit_code = 1;
   } catch (cv::Exception& e) {
     error_log("CV error: %s\n", e.what());
