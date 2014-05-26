@@ -18,7 +18,7 @@
 
 namespace imtools {
 
-bool verbose = false;
+int verbose = 0;
 
 void
 diff(cv::Mat& out_img, const cv::Mat& old_img, const cv::Mat& new_img, const int mod_threshold)

@@ -65,7 +65,8 @@
 namespace imtools {
 
 /// Verbose mode for CLI output
-extern bool verbose;
+/// 0 - off, 1 - verbose, 2 - more verbose
+extern int verbose;
 
 typedef unsigned int uint_t;
 typedef cv::Rect bound_box_t;
@@ -106,6 +107,13 @@ file_exists(const char *filename)
 {
   struct stat st;
   return (stat(filename, &st) == 0);
+}
+
+inline bool
+file_exists(const std::string& filename)
+{
+  struct stat st;
+  return (stat(filename.c_str(), &st) == 0);
 }
 
 

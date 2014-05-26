@@ -29,7 +29,7 @@ using std::string;
 static void
 cleanup(bool is_error)
 {
-  verbose_log("Cleanup...\n");
+  verbose_log2("Cleanup...\n");
 
   // Release resources allocated for threading
 
@@ -45,7 +45,7 @@ cleanup(bool is_error)
       for (images_vector_t::iterator it = g_generated_files.begin(); it != g_generated_files.end(); ++it) {
         const char* filename = (*it).c_str();
         if (file_exists(filename)) {
-          verbose_log("Removing %s\n", filename);
+          verbose_log2("Removing %s\n", filename);
           unlink(filename);
         }
       }
@@ -226,7 +226,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
   cv::Mat old_img, out_img, old_tpl_img, new_tpl_img;
   string merged_filename;
 
-  verbose_log("Processing target: %s\n", filename.c_str());
+  verbose_log2("Processing target: %s\n", filename.c_str());
 
   // Load next target forcing 3 channels
 
@@ -244,35 +244,38 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
   bound_box_vector_t boxes;
   bound_boxes(boxes, diff_img);
-  debug_log("boxes.size() = %ld\n", boxes.size());
+
+  int n_boxes = boxes.size();
+  debug_log("boxes.size() = %ld\n", n_boxes);
 
   // Apply the bounding boxes
 
-  int n_boxes = boxes.size();
 #if defined(IMTOOLS_THREADS)
-  auto pbarg = new box_arg_t[n_boxes];
+  if (n_boxes) {
+    auto pbarg = new box_arg_t[n_boxes];
 
-  for (int i = 0; i < n_boxes; i++) {
-    IT_LOCK(g_work_mutex);
-    debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
+    for (int i = 0; i < n_boxes; i++) {
+      IT_LOCK(g_work_mutex);
+      debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
 
-    pbarg[i].box = &boxes[i];
-    pbarg[i].old_img = &old_img;
-    pbarg[i].out_img = &out_img;
+      pbarg[i].box = &boxes[i];
+      pbarg[i].old_img = &old_img;
+      pbarg[i].out_img = &out_img;
 
-    debug_log("pbarg address: %p\n", static_cast<void*>(&pbarg[i]));
-    pthread_create(&pbarg[i].thread_id, &g_pta, apply_bounding_box, &pbarg[i]);
-    IT_UNLOCK(g_work_mutex);
+      debug_log("pbarg address: %p\n", static_cast<void*>(&pbarg[i]));
+      pthread_create(&pbarg[i].thread_id, &g_pta, apply_bounding_box, &pbarg[i]);
+      IT_UNLOCK(g_work_mutex);
+    }
+
+    // Wait until threads are finished
+
+    for (int i = 0; i < n_boxes; i++) {
+      debug_log("joining thread #%ld\n", pbarg[i].thread_id);
+      pthread_join(pbarg[i].thread_id, NULL);
+    }
+
+    delete [] pbarg;
   }
-
-  // Wait until threads are finished
-
-  for (int i = 0; i < n_boxes; i++) {
-    debug_log("joining thread #%ld\n", pbarg[i].thread_id);
-    pthread_join(pbarg[i].thread_id, NULL);
-  }
-
-  delete [] pbarg;
 #else // no threads
   for (int i = 0; i < n_boxes; i++) {
     debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
@@ -291,12 +294,21 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
   merged_filename = out_filename
     ? out_filename->c_str()
     : (g_out_dir + "/" + basename(filename.c_str()));
-  verbose_log("Writing to %s\n", merged_filename.c_str());
+
   if (g_strict) {
-    g_generated_files.push_back(merged_filename);
+    if (file_exists(merged_filename))
+      throw ErrorException("strict mode prohibits writing to existing file " + merged_filename);
   }
+
+  verbose_log2("Writing to %s\n", merged_filename.c_str());
   if (!cv::imwrite(merged_filename, out_img, g_compression_params)) {
     throw FileWriteErrorException(merged_filename);
+  }
+
+  verbose_log("[Output] file:%s boxes:%d\n", merged_filename.c_str(), n_boxes);
+
+  if (g_strict) {
+    g_generated_files.push_back(merged_filename);
   }
 }
 
@@ -455,7 +467,7 @@ int main(int argc, char **argv)
         break;
 
       case 'v':
-        verbose = true;
+        verbose++;
         break;
 
       case 'p':
@@ -522,7 +534,7 @@ int main(int argc, char **argv)
     // Copy new image
 
     string out_filename = g_out_dir + "/" + g_old_image_filename;
-    verbose_log("Copying %s to %s\n", g_new_image_filename.c_str(), out_filename.c_str());
+    verbose_log2("Copying %s to %s\n", g_new_image_filename.c_str(), out_filename.c_str());
     if (!cv::imwrite(out_filename, g_new_img, g_compression_params)) {
       throw FileWriteErrorException(out_filename);
     }

@@ -127,7 +127,7 @@ int main(int argc, char** argv)
         break;
 
       case 'v':
-        imtools::verbose = true;
+        imtools::verbose++;
         break;
 
       case -1:

@@ -25,9 +25,13 @@
 # define debug_log(__fmt, ...)
 #endif
 
-#define verbose_log(...)                            \
-  do {                                              \
-    if (imtools::verbose) printf("* " __VA_ARGS__); \
+#define verbose_log(...)                       \
+  do {                                         \
+    if (imtools::verbose) printf(__VA_ARGS__); \
+  } while (0)
+#define verbose_log2(...)                               \
+  do {                                                  \
+    if (imtools::verbose > 1) printf("v2: " __VA_ARGS__); \
   } while (0)
 
 #define error_log(...) fprintf(stderr, "!! Error: " __VA_ARGS__)
