@@ -34,7 +34,7 @@
 #include "log.hxx"
 #include "exceptions.hxx"
 
-#define IMTOOLS_VERSION "1.0.2-r2"
+#define IMTOOLS_VERSION "1.0.2-r3"
 
 #ifdef IMTOOLS_DEBUG
 # define IMTOOLS_BUILD_TYPE "debug"
