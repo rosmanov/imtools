@@ -27,17 +27,6 @@ FileWriteErrorException::FileWriteErrorException(string filename)
   mMsg = "Failed to write to " + filename + ", check for access permissions";
 }
 
-
-InvalidTargetDimensionsException::InvalidTargetDimensionsException(const cv::Mat& orgMat, const cv::Mat& targetMat)
-{
-  ostringstream ostr;
-
-  ostr << "Invalid target dimensions, original: " << orgMat.cols << "x" << orgMat.rows
-    << ", target: " << targetMat.cols << "x" << targetMat.rows;
-
-  mMsg = ostr.str();
-}
-
 }
 
 // vim: et ts=2 sts=2 sw=2

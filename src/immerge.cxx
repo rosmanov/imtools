@@ -192,9 +192,6 @@ apply_bounding_box(void* arg)
   } catch (TemplateOutOfBoundsException& e) {
     IMTOOLS_THREAD_FAILURE_SET(true);
     warning_log( "%s, skipping!\n", e.what());
-  } catch (InvalidTargetDimensionsException& e) {
-    IMTOOLS_THREAD_FAILURE_SET(true);
-    warning_log( "%s, skipping!\n", e.what());
   } catch (ErrorException& e) {
     IMTOOLS_THREAD_FAILURE_SET(true);
     error_log("%s\n", e.what());
