@@ -133,12 +133,15 @@ void match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl
 
 /// Patch IMG_MAT at position (X, Y) with contents of TPL_MAT.
 /// Result is stored in OUT_MAT. OUT_MAT must be of the same size and type as IMG_MAT.
-void patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat,
-    const int x, const int y);
+void patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const cv::Rect& roi);
 
 /// Find bounding boxes in mask (can be obtained with diff() + threshold())
 void bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask,
     int min_threshold = THRESHOLD_BOXES_MIN, int max_threshold = THRESHOLD_BOXES_MAX);
+
+/// Computes structural similarity coefficient, i.e. similarity between i1 and i2 matrices.
+/// Each item of the return value is a number between 0 and 1, where 1 is the perfect match.
+cv::Scalar get_MSSIM(const cv::Mat& i1, const cv::Mat& i2);
 
 } // namespace imtools
 

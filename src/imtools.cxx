@@ -120,9 +120,9 @@ match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl)
 
 
 void
-patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const int x, const int y)
+patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const cv::Rect& roi)
 {
-  debug_log("imtools::patch(), x: %d, y: %d\n", x, y);
+  debug_log("imtools::patch(), x: %d, y: %d\n", roi.x, roi.y);
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
@@ -138,14 +138,14 @@ patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const in
   assert(out_mat.type() == img_mat.type());
   assert(img_mat.rows >= tpl_mat.rows && img_mat.cols >= tpl_mat.cols);
 
-  if ((x + tpl_mat.cols) > out_mat.cols
-      || (y + tpl_mat.rows) > out_mat.rows)
+  if ((roi.x + tpl_mat.cols) > out_mat.cols
+      || (roi.y + tpl_mat.rows) > out_mat.rows)
   {
-    throw TemplateOutOfBoundsException(tpl_mat, out_mat, cv::Point(x, y));
+    throw TemplateOutOfBoundsException(tpl_mat, out_mat, roi);
   }
 
   // Region of interest
-  cv::Rect roi = cv::Rect(x, y, tpl_mat.cols, tpl_mat.rows);
+  //cv::Rect roi = cv::Rect(pt.x, pt.y, tpl_mat.cols, tpl_mat.rows);
 
   // Output matrix should be prepared already.
   // out_mat = img_mat.clone();
@@ -203,6 +203,59 @@ bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask, int min_threshold, i
   debug_timer_end(t1, t2, imtools::bound_boxes);
 }
 
+
+/// Computes structural similarity coefficient.
+/// The code is borrowed from
+/// http://docs.opencv.org/doc/tutorials/highgui/video-input-psnr-ssim/video-input-psnr-ssim.html#image-similarity-psnr-and-ssim
+cv::Scalar get_MSSIM(const cv::Mat& i1, const cv::Mat& i2)
+{
+  const double C1 = 6.5025, C2 = 58.5225;
+  int d           = CV_32F;
+
+  cv::Mat I1, I2;
+  i1.convertTo(I1, d); // cannot calculate on one byte large values
+  i2.convertTo(I2, d);
+
+  cv::Mat I2_2  = I2.mul(I2); // I2^2
+  cv::Mat I1_2  = I1.mul(I1); // I1^2
+  cv::Mat I1_I2 = I1.mul(I2); // I1 * I2
+
+
+  cv::Mat mu1, mu2;
+  cv::GaussianBlur(I1, mu1, cv::Size(11, 11), 1.5);
+  cv::GaussianBlur(I2, mu2, cv::Size(11, 11), 1.5);
+
+  cv::Mat mu1_2   = mu1.mul(mu1);
+  cv::Mat mu2_2   = mu2.mul(mu2);
+  cv::Mat mu1_mu2 = mu1.mul(mu2);
+
+  cv::Mat sigma1_2, sigma2_2, sigma12;
+
+  cv::GaussianBlur(I1_2, sigma1_2, cv::Size(11, 11), 1.5);
+  sigma1_2 -= mu1_2;
+
+  cv::GaussianBlur(I2_2, sigma2_2, cv::Size(11, 11), 1.5);
+  sigma2_2 -= mu2_2;
+
+  cv::GaussianBlur(I1_I2, sigma12, cv::Size(11, 11), 1.5);
+  sigma12 -= mu1_mu2;
+
+  cv::Mat t1, t2, t3;
+
+  t1 = 2 * mu1_mu2 + C1;
+  t2 = 2 * sigma12 + C2;
+  t3 = t1.mul(t2);  // t3 = ((2*mu1_mu2 + C1).*(2*sigma12 + C2))
+
+  t1 = mu1_2 + mu2_2 + C1;
+  t2 = sigma1_2 + sigma2_2 + C2;
+  t1 = t1.mul(t2); // t1 =((mu1_2 + mu2_2 + C1).*(sigma1_2 + sigma2_2 + C2))
+
+  cv::Mat ssim_map;
+  cv::divide(t3, t1, ssim_map); // ssim_map =  t3./t1;
+
+  cv::Scalar mssim = cv::mean(ssim_map); // mssim = average of ssim map
+  return mssim;
+}
 
 } // namespace imtools
 // vim: et ts=2 sts=2 sw=2

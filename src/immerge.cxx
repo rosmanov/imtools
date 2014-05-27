@@ -84,8 +84,8 @@ load_images(const int argc, char** argv)
         const char* filename = argv[optind++];
 
         if (i++ % 2 == 0) {
-          if (i > IMTOOLS_MAX_MERGE_TARGETS) {
-            strict_log(g_strict, "max. number of targets exceeded: %d. Skipping the rest.\n", IMTOOLS_MAX_MERGE_TARGETS);
+          if (i > MAX_MERGE_TARGETS) {
+            strict_log(g_strict, "max. number of targets exceeded: %d. Skipping the rest.\n", MAX_MERGE_TARGETS);
             break;
           }
 
@@ -110,8 +110,8 @@ load_images(const int argc, char** argv)
       assert(g_dst_images.size() == g_out_images.size());
     } else { // IMAGES is a list of output files
       for (int i = 0; optind < argc; ++i) {
-        if (i >= IMTOOLS_MAX_MERGE_TARGETS) {
-          strict_log(g_strict, "max. number of targets exceeded: %d. Skipping the rest.\n", IMTOOLS_MAX_MERGE_TARGETS);
+        if (i >= MAX_MERGE_TARGETS) {
+          strict_log(g_strict, "max. number of targets exceeded: %d. Skipping the rest.\n", MAX_MERGE_TARGETS);
           break;
         }
 
@@ -183,15 +183,26 @@ apply_bounding_box(void* arg)
 
     new_tpl_img = cv::Mat(g_new_img, *pbarg->box);
 
+    // Region of interest
+
+    auto roi = cv::Rect(match_loc.x, match_loc.y, new_tpl_img.cols, new_tpl_img.rows);
+
+    if (g_strict >= 2) {
+      auto mssim = get_MSSIM(new_tpl_img, (*pbarg->out_img)(roi));
+      debug_log("mssim: %f %f %f\n", mssim.val[0], mssim.val[1], mssim.val[2]);
+      auto avg_mssim = (mssim.val[0] + mssim.val[1] + mssim.val[2]) / 3;
+      if (avg_mssim < MIN_MSSIM) {
+        // Images are considered significantly different
+        throw LowMssimException(avg_mssim, roi);
+      }
+    }
+
     // Copy NEW_TPL_IMG over the mask of the target matrix OLD_IMG
     // at location (match_loc.x, match_loc.y).
     // The result will be stored in OUT_IMG.
 
-    patch(*pbarg->out_img, g_new_img, new_tpl_img, match_loc.x, match_loc.y);
+    patch(*pbarg->out_img, g_new_img, new_tpl_img, roi);
 
-  } catch (TemplateOutOfBoundsException& e) {
-    IMTOOLS_THREAD_FAILURE_SET(true);
-    warning_log( "%s, skipping!\n", e.what());
   } catch (ErrorException& e) {
     IMTOOLS_THREAD_FAILURE_SET(true);
     error_log("%s\n", e.what());
@@ -401,7 +412,7 @@ int main(int argc, char **argv)
       case 'n':
       case 'o':
         if (!file_exists(optarg)) {
-          strict_log(g_strict, "File %s doesn't exist", optarg);
+          error_log("File %s doesn't exist", optarg);
           usage(true);
           exit(1);
         }
@@ -416,12 +427,12 @@ int main(int argc, char **argv)
         {
           struct stat st;
           if (stat(optarg, &st)) {
-            strict_log(g_strict, "invalid output directory '%s', %s.\n", optarg, strerror(errno));
+            error_log("invalid output directory '%s', %s.\n", optarg, strerror(errno));
             usage(true);
             exit(1);
           }
           if (!S_ISDIR(st.st_mode)) {
-            strict_log(g_strict, "%s is not a directory.\n", optarg);
+            error_log("%s is not a directory.\n", optarg);
             usage(true);
             exit(1);
           }
@@ -458,7 +469,7 @@ int main(int argc, char **argv)
         break;
 
       case 's':
-        g_strict = true;
+        g_strict++;
         break;
 
       case -1:
@@ -471,7 +482,7 @@ int main(int argc, char **argv)
         exit(1);
 
       default:
-        strict_log(g_strict, "getopt returned character code 0%o\n", next_option);
+        error_log("getopt returned character code 0%o\n", next_option);
         usage(true);
         exit(1);
     }
@@ -513,15 +524,6 @@ int main(int argc, char **argv)
 
     merge();
 
-#if 0
-    // Copy new image
-
-    string out_filename = g_out_dir + "/" + g_old_image_filename;
-    verbose_log2("Copying %s to %s\n", g_new_image_filename.c_str(), out_filename.c_str());
-    if (!cv::imwrite(out_filename, g_new_img, g_compression_params)) {
-      throw FileWriteErrorException(out_filename);
-    }
-#endif
   } catch (imtools::ErrorException& e) {
     error_log("%s\n", e.what());
     exit_code = 1;

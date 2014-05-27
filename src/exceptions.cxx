@@ -8,11 +8,11 @@ using cv::Point;
 namespace imtools
 {
 
-TemplateOutOfBoundsException::TemplateOutOfBoundsException(const Mat& tplMat, const Mat& outMat, const Point& pt)
+TemplateOutOfBoundsException::TemplateOutOfBoundsException(const Mat& tplMat, const Mat& outMat, const Rect& roi)
 {
   ostringstream ostr;
 
-  ostr << "Template is out of bounds, location: " << pt.x << ";" << pt.y
+  ostr << "Template is out of bounds, location: " << roi.x << ";" << roi.y
     << ", tpl cols: " << tplMat.cols
     << ", tpl rows: " << tplMat.rows
     << ", out cols: " << outMat.cols
@@ -25,6 +25,18 @@ TemplateOutOfBoundsException::TemplateOutOfBoundsException(const Mat& tplMat, co
 FileWriteErrorException::FileWriteErrorException(string filename)
 {
   mMsg = "Failed to write to " + filename + ", check for access permissions";
+}
+
+
+LowMssimException::LowMssimException(double mssim, Rect& roi)
+{
+  ostringstream ostr;
+
+  ostr << "Low MSSIM value (images considered different): " << mssim
+    << ", skipping region " << roi.width << "x" << roi.height
+    << " at " << roi.x << "," << roi.y;
+
+  mMsg = ostr.str();
 }
 
 }

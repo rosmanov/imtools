@@ -23,6 +23,8 @@
 using std::runtime_error;
 using std::string;
 using cv::Point;
+using cv::Mat;
+using cv::Rect;
 
 namespace imtools {
 
@@ -42,7 +44,7 @@ class ErrorException : public runtime_error
 class TemplateOutOfBoundsException: public ErrorException
 {
   public:
-    TemplateOutOfBoundsException(const cv::Mat& tplMat, const cv::Mat& outMat, const Point& pt);
+    TemplateOutOfBoundsException(const Mat& tplMat, const Mat& outMat, const Rect& roi);
     virtual ~TemplateOutOfBoundsException() throw() {}
 };
 
@@ -53,6 +55,15 @@ class FileWriteErrorException: public ErrorException
     FileWriteErrorException(string filename);
     virtual ~FileWriteErrorException() throw() {};
 };
+
+
+class LowMssimException: public ErrorException
+{
+  public:
+    LowMssimException(double mssim, Rect& roi);
+    virtual ~LowMssimException() throw() {}
+};
+
 
 }
 

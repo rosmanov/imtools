@@ -1,12 +1,17 @@
 #ifndef IMTOOLS_IMMERGE_VARS_HXX
 #define IMTOOLS_IMMERGE_VARS_HXX
 
-using namespace imtools;
 using std::string;
 
+namespace imtools
+{
 
 /// Max. number of target images
-const int IMTOOLS_MAX_MERGE_TARGETS = 100;
+const int MAX_MERGE_TARGETS = 100;
+
+/// Min. accepted value of the structural similarity coefficient in (double) strict mode.
+/// See http://docs.opencv.org/doc/tutorials/highgui/video-input-psnr-ssim/video-input-psnr-ssim.html#image-similarity-psnr-and-ssim
+const double MIN_MSSIM = 0.5;
 
 const char* g_program_name;
 
@@ -24,17 +29,18 @@ string g_out_dir = ".";
 bool g_pairs = false;
 
 // Whether to turn warnings into fatal errors
-bool g_strict = false;
+int g_strict = 0;
 
 // Matrices for old and new images
 cv::Mat g_old_img;
 cv::Mat g_new_img;
 
-#ifdef IMTOOLS_THREADS
-// Whether some thread function failed
-// (we don't cancel threads in order to avoid possible memory leaks etc.)
+// Whether some (thread) function failed
+// (we don't cancel threads in order to avoid possible memory leaks etc.).
+// We use this flag for non-threaded version, too.
 bool g_thread_failure = false;
 
+#ifdef IMTOOLS_THREADS
 pthread_mutex_t g_work_mutex;
 pthread_mutex_t g_process_images_mutex;
 // Mutex for g_thread_failure variable
@@ -63,7 +69,9 @@ const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 " -h, --help                 Display this help.\n"
 " -v, --verbose              Turn on verbose output. Can be used multiple times\n"
 "                            to increase verbosity (e.g. -vv). Default: off.\n"
-" -s, --strict               Turn on warnings into errors. Default: off.\n"
+" -s, --strict               Turn on warnings into errors. Can be used multiple times\n"
+"                            to increase strictness. Double value (-ss) will enable extra\n"
+"                            structural similarity checks for each patch. Default: off.\n"
 " -n, --new-image            New image. Required.\n"
 " -o, --old-image            Old image. Required.\n"
 " -d, --out-dir              Output directory. Default: current directory.\n"
@@ -95,4 +103,5 @@ const struct option g_long_options[] = {
   {0,                     0,                 0,    0}
 };
 
+} // namespace imtools
 #endif // IMTOOLS_IMMERGE_VARS_HXX

@@ -57,8 +57,9 @@ patch()
 
     cv::Mat out_mat;
     cv::Mat img_mat = cv::imread(*it);
+    cv::Rect roi = cv::Rect(g_x, g_y, tpl_mat.cols, tpl_mat.rows);
 
-    imtools::patch(out_mat, img_mat, tpl_mat, g_x, g_y);
+    imtools::patch(out_mat, img_mat, tpl_mat, roi);
 
     std::string out_filename = "out_" + g_tpl_filename;
     verbose_log("Writing to %s", out_filename.c_str());
