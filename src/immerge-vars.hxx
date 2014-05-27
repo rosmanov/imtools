@@ -40,7 +40,7 @@ pthread_mutex_t g_process_images_mutex;
 // Mutex for g_thread_failure variable
 pthread_mutex_t g_thread_failure_mutex;
 pthread_attr_t g_pta;
-#endif
+#endif // if threads
 
 // Destination images
 images_vector_t g_dst_images;

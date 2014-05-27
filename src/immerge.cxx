@@ -164,12 +164,7 @@ apply_bounding_box(void* arg)
   cv::Mat    new_tpl_img;
   cv::Point  match_loc;
 
-  IT_LOCK(g_thread_failure_mutex);
-  if (g_thread_failure) {
-    IT_UNLOCK(g_thread_failure_mutex);
-    return NULL;
-  }
-  IT_UNLOCK(g_thread_failure_mutex);
+  IMTOOLS_THREAD_FAILURE_CHECK(NULL);
 
   pbarg = (box_arg_t *) arg;
   assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
@@ -195,22 +190,16 @@ apply_bounding_box(void* arg)
     patch(*pbarg->out_img, g_new_img, new_tpl_img, match_loc.x, match_loc.y);
 
   } catch (TemplateOutOfBoundsException& e) {
-    IT_LOCK(g_thread_failure_mutex);
-    g_thread_failure = true;
-    IT_UNLOCK(g_thread_failure_mutex);
-
+    IMTOOLS_THREAD_FAILURE_SET(true);
+    warning_log( "%s, skipping!\n", e.what());
+  } catch (InvalidTargetDimensionsException& e) {
+    IMTOOLS_THREAD_FAILURE_SET(true);
     warning_log( "%s, skipping!\n", e.what());
   } catch (ErrorException& e) {
-    IT_LOCK(g_thread_failure_mutex);
-    g_thread_failure = true;
-    IT_UNLOCK(g_thread_failure_mutex);
-
+    IMTOOLS_THREAD_FAILURE_SET(true);
     error_log("%s\n", e.what());
   } catch (...) {
-    IT_LOCK(g_thread_failure_mutex);
-    g_thread_failure = true;
-    IT_UNLOCK(g_thread_failure_mutex);
-
+    IMTOOLS_THREAD_FAILURE_SET(true);
     error_log("Caught unknown exception!\n");
   }
 
@@ -286,6 +275,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
     apply_bounding_box(&pbarg);
   }
 #endif // IMTOOLS_THREADS
+  IMTOOLS_THREAD_FAILURE_CHECK(/* void */);
 
   // Save merged matrix to filesystem
 
@@ -321,9 +311,7 @@ process_image_thread_func(void* arg)
     process_image(*ipa->filename, *ipa->diff_img, ipa->out_filename);
   } catch (ErrorException& e) {
     error_log("%s\n", e.what());
-    IT_LOCK(g_thread_failure_mutex);
-    g_thread_failure = true;
-    IT_UNLOCK(g_thread_failure_mutex);
+    IMTOOLS_THREAD_FAILURE_SET(true);
     pthread_exit(NULL);
   }
 
@@ -548,7 +536,7 @@ int main(int argc, char **argv)
     exit_code = 1;
   }
 
-  if (g_strict && g_thread_failure) {
+  if (g_strict && IMTOOLS_THREAD_FAILURE_VAL()) {
     exit_code = 1;
   }
 

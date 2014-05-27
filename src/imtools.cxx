@@ -133,8 +133,13 @@ patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const in
     throw std::runtime_error(std::string("Input template matrix is empty"));
   }
 
+  if (!(out_mat.rows >= img_mat.rows && out_mat.cols >= img_mat.cols)) {
+    throw InvalidTargetDimensionsException(img_mat, out_mat);
+  }
+
   assert(!img_mat.empty());
-  assert(out_mat.rows >= img_mat.rows && out_mat.cols >= img_mat.cols && out_mat.type() == img_mat.type());
+  assert(out_mat.rows >= img_mat.rows && out_mat.cols >= img_mat.cols);
+  assert(out_mat.type() == img_mat.type());
   assert(img_mat.rows >= tpl_mat.rows && img_mat.cols >= tpl_mat.cols);
 
   if ((x + tpl_mat.cols) > out_mat.cols

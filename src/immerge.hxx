@@ -21,6 +21,30 @@
 #include "imtools.hxx"
 #include "immerge-vars.hxx"
 
+#ifdef IMTOOLS_THREADS
+# define IMTOOLS_THREAD_FAILURE_VAL() g_thread_failure
+# define IMTOOLS_THREAD_FAILURE_SET(v)  \
+  do {                                 \
+    IT_LOCK(g_thread_failure_mutex);   \
+    g_thread_failure = (v);            \
+    IT_UNLOCK(g_thread_failure_mutex); \
+  } while (0)
+
+# define IMTOOLS_THREAD_FAILURE_CHECK(__ret) \
+  do {                                       \
+    IT_LOCK(g_thread_failure_mutex);         \
+    if (g_thread_failure) {                  \
+      IT_UNLOCK(g_thread_failure_mutex);     \
+      return __ret;                          \
+    }                                        \
+    IT_UNLOCK(g_thread_failure_mutex);       \
+  } while (0)
+#else // no threads
+# define IMTOOLS_THREAD_FAILURE_VAL() 0
+# define IMTOOLS_THREAD_FAILURE_SET(v)
+# define IMTOOLS_THREAD_FAILURE_CHECK(__ret)
+#endif
+
 namespace imtools {
 
 } // imtools

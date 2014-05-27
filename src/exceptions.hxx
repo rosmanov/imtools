@@ -54,6 +54,14 @@ class FileWriteErrorException: public ErrorException
     virtual ~FileWriteErrorException() throw() {};
 };
 
+
+class InvalidTargetDimensionsException: public ErrorException
+{
+  public:
+    InvalidTargetDimensionsException(const cv::Mat& orgMat, const cv::Mat& targetMat);
+    virtual ~InvalidTargetDimensionsException() throw() {}
+};
+
 }
 
 #endif // IMTOOLS_EXCEPTIONS_HXX
