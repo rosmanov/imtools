@@ -20,6 +20,38 @@ namespace imtools {
 
 int verbose = 0;
 
+
+int
+get_int_opt_arg(const char* optarg, const char* format, ...)
+{
+  if (optarg) {
+    char *optarg_end;
+    int ret = strtol(optarg, &optarg_end, 10);
+    if (*optarg_end != '\0' || ret < 0) {
+      goto err;
+    }
+
+    return ret;
+  }
+
+err:
+  if (format) {
+    std::string error;
+
+    va_list args;
+    va_start(args, format);
+    char message[1024];
+    int message_len = vsnprintf(message, sizeof(message), format, args);
+    error = std::string(message, message_len);
+    va_end(args);
+
+    throw InvalidCliArgException(error);
+  }
+
+  return -1;
+}
+
+
 void
 diff(cv::Mat& out_img, const cv::Mat& old_img, const cv::Mat& new_img, const int mod_threshold)
 {

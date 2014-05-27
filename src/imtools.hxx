@@ -28,6 +28,7 @@
 #include <cassert>
 #include <cerrno>
 #include <ctime>
+#include <cstdarg>
 #include <unistd.h>
 
 #include "threads.hxx"
@@ -51,15 +52,29 @@
 #define IMTOOLS_FULL_NAME "ImTools " IMTOOLS_VERSION " (" IMTOOLS_BUILD_TYPE ") (" IMTOOLS_SUFFIX ")"
 #define IMTOOLS_COPYRIGHT "Copyright (C) 2014 - Ruslan Osmanov <rrosmanov@gmail.com>"
 
-#define save_int_opt_arg(__arg, ...)         \
-{                                            \
-  char *optarg_end;                          \
-  (__arg) = strtol(optarg, &optarg_end, 10); \
-  if (*optarg_end != '\0' || (__arg) < 0) {  \
-    error_log(__VA_ARGS__);                  \
-    usage(true);                             \
-  }                                          \
+#if 0
+
+#define save_int_opt_arg(__arg, ...)           \
+{                                              \
+  if (optarg) {                                \
+    char *optarg_end;                          \
+    (__arg) = strtol(optarg, &optarg_end, 10); \
+    if (*optarg_end != '\0' || (__arg) < 0) {  \
+      error_log(__VA_ARGS__);                  \
+      usage(true);                             \
+    }                                          \
+  } else {                                     \
+    error_log(__VA_ARGS__);                    \
+    usage(true);                               \
+  }                                            \
 }
+#else
+#define save_int_opt_arg(__arg, ...)              \
+{                                                 \
+  (__arg) = get_int_opt_arg(optarg, __VA_ARGS__); \
+}
+
+#endif
 
 
 namespace imtools {
@@ -115,6 +130,9 @@ file_exists(const std::string& filename)
   struct stat st;
   return (stat(filename.c_str(), &st) == 0);
 }
+
+
+int get_int_opt_arg(const char* optarg, const char* format, ...);
 
 
 // Computes difference between old_img and new_img. The matrix values lower than mod_threshold are

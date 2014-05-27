@@ -401,92 +401,93 @@ int main(int argc, char **argv)
 
   // Parse CLI arguments
 
-  do {
-    next_option = getopt_long(argc, argv, g_short_options, g_long_options, NULL);
+  try {
+    do {
+      next_option = getopt_long(argc, argv, g_short_options, g_long_options, NULL);
 
-    switch (next_option) {
-      case 'h':
-        usage(false);
-        exit(0);
+      switch (next_option) {
+        case 'h':
+          usage(false);
+          exit(0);
 
-      case 'n':
-      case 'o':
-        if (!file_exists(optarg)) {
-          error_log("File %s doesn't exist", optarg);
+        case 'n':
+        case 'o':
+          if (!file_exists(optarg)) {
+            throw InvalidCliArgException("File %s doesn't exist", optarg);
+          }
+          if (next_option == 'n') {
+            g_new_image_filename = optarg;
+          } else {
+            g_old_image_filename = optarg;
+          }
+          break;
+
+        case 'd':
+          {
+            struct stat st;
+            if (stat(optarg, &st)) {
+              throw InvalidCliArgException("invalid output directory '%s', %s.\n", optarg, strerror(errno));
+            }
+            if (!S_ISDIR(st.st_mode)) {
+              throw InvalidCliArgException("%s is not a directory.\n", optarg);
+            }
+            g_out_dir = optarg;
+            break;
+          }
+
+        case 'm':
+          save_int_opt_arg(g_mod_threshold, "Invalid modification threshold\n");
+          break;
+
+        case 'L':
+          save_int_opt_arg(g_min_threshold, "Invalid min threshold\n");
+          break;
+
+        case 'H':
+          save_int_opt_arg(g_max_threshold, "Invalid max threshold\n");
+          break;
+
+        case 'b':
+          save_int_opt_arg(g_min_boxes_threshold, "Invalid min bound boxes threshold\n");
+          break;
+
+        case 'B':
+          save_int_opt_arg(g_max_boxes_threshold, "Invalid max bound boxes threshold\n");
+          break;
+
+        case 'v':
+          verbose++;
+          break;
+
+        case 'p':
+          g_pairs = true;
+          break;
+
+        case 's':
+          g_strict++;
+          break;
+
+        case -1:
+          // done with options
+          break;
+
+        case '?':
+          // unrecognized option
           usage(true);
           exit(1);
-        }
-        if (next_option == 'n') {
-          g_new_image_filename = optarg;
-        } else {
-          g_old_image_filename = optarg;
-        }
-        break;
 
-      case 'd':
-        {
-          struct stat st;
-          if (stat(optarg, &st)) {
-            error_log("invalid output directory '%s', %s.\n", optarg, strerror(errno));
-            usage(true);
-            exit(1);
-          }
-          if (!S_ISDIR(st.st_mode)) {
-            error_log("%s is not a directory.\n", optarg);
-            usage(true);
-            exit(1);
-          }
-          g_out_dir = optarg;
-          break;
-        }
+        default:
+          error_log("getopt returned character code 0%o\n", next_option);
+          usage(true);
+          exit(1);
+      }
+    } while (next_option != -1);
+  } catch (imtools::InvalidCliArgException& e) {
+    error_log("%s\n", e.what());
+    usage(true);
+    exit(1);
+  }
 
-      case 'm':
-        save_int_opt_arg(g_mod_threshold, "Invalid modification threshold\n");
-        break;
-
-      case 'L':
-        save_int_opt_arg(g_min_threshold, "Invalid min threshold\n");
-        break;
-
-      case 'H':
-        save_int_opt_arg(g_max_threshold, "Invalid max threshold\n");
-        break;
-
-      case 'b':
-        save_int_opt_arg(g_min_boxes_threshold, "Invalid min bound boxes threshold\n");
-        break;
-
-      case 'B':
-        save_int_opt_arg(g_max_boxes_threshold, "Invalid max bound boxes threshold\n");
-        break;
-
-      case 'v':
-        verbose++;
-        break;
-
-      case 'p':
-        g_pairs = true;
-        break;
-
-      case 's':
-        g_strict++;
-        break;
-
-      case -1:
-        // done with options
-        break;
-
-      case '?':
-        // unrecognized option
-        usage(true);
-        exit(1);
-
-      default:
-        error_log("getopt returned character code 0%o\n", next_option);
-        usage(true);
-        exit(1);
-    }
-  } while (next_option != -1);
 
   debug_log("out-dir: %s\n", g_out_dir.c_str());
   debug_log("mod-threshold: %d\n", g_mod_threshold);

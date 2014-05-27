@@ -65,6 +65,14 @@ class LowMssimException: public ErrorException
 };
 
 
+class InvalidCliArgException: public ErrorException
+{
+  public:
+    InvalidCliArgException(string& msg) { mMsg = msg; }
+    InvalidCliArgException(const char* format, ...);
+    virtual ~InvalidCliArgException() throw() {}
+};
+
 }
 
 #endif // IMTOOLS_EXCEPTIONS_HXX
