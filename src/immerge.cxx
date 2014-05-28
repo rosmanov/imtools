@@ -193,7 +193,7 @@ apply_bounding_box(void* arg)
       auto avg_mssim = (mssim.val[0] + mssim.val[1] + mssim.val[2]) / 3;
       if (avg_mssim < MIN_MSSIM) {
         // Images are considered significantly different
-        throw LowMssimException(avg_mssim, roi);
+        throw LowMssimException(avg_mssim, roi, *pbarg->filename);
       }
     }
 
@@ -205,10 +205,10 @@ apply_bounding_box(void* arg)
 
   } catch (ErrorException& e) {
     IMTOOLS_THREAD_FAILURE_SET(true);
-    error_log("%s\n", e.what());
+    log::push_error(e.what());
   } catch (...) {
     IMTOOLS_THREAD_FAILURE_SET(true);
-    error_log("Caught unknown exception!\n");
+    log::push_error("Caught unknown exception!\n");
   }
 
   return NULL;
@@ -256,8 +256,8 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
       pbarg[i].box = &boxes[i];
       pbarg[i].old_img = &old_img;
       pbarg[i].out_img = &out_img;
+      pbarg[i].filename = &filename;
 
-      debug_log("pbarg address: %p\n", static_cast<void*>(&pbarg[i]));
       pthread_create(&pbarg[i].thread_id, &g_pta, apply_bounding_box, &pbarg[i]);
       IT_UNLOCK(g_work_mutex);
     }
@@ -279,10 +279,13 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
     pbarg.box = &boxes[i];
     pbarg.old_img = &old_img;
     pbarg.out_img = &out_img;
+    pbarg.filename = &filename;
 
     apply_bounding_box(&pbarg);
   }
 #endif // IMTOOLS_THREADS
+
+  log::print_all();
   IMTOOLS_THREAD_FAILURE_CHECK(/* void */);
 
   // Save merged matrix to filesystem

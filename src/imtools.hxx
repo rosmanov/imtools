@@ -108,6 +108,7 @@ struct box_arg_t {
   bound_box_t *box;
   cv::Mat     *old_img;
   cv::Mat     *out_img;
+  std::string *filename;
 };
 
 struct image_process_arg_t {

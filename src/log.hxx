@@ -17,6 +17,17 @@
 #ifndef IMTOOLS_LOG_HXX
 #define IMTOOLS_LOG_HXX
 
+#include "imtools.hxx"
+
+using std::vector;
+using std::string;
+
+namespace imtools
+{
+
+namespace log
+{
+
 #ifdef IMTOOLS_DEBUG
 # define debug_log0(__str) printf("[Debug] [%lu] " __str, pthread_self())
 # define debug_log(__fmt, ...) printf("[Debug] [%lu] " __fmt, pthread_self(), __VA_ARGS__)
@@ -47,7 +58,6 @@
     }                              \
   } while(0)
 
-
 #ifdef IMTOOLS_DEBUG
 # define timespec_to_float(__t) ((double)((__t).tv_sec + (__t).tv_nsec * 1e-9))
 # define debug_timer_init(__t1, __t2) struct timespec __t1, __t2
@@ -65,5 +75,37 @@
 # define debug_timer_end(__t1, __t2, __name)
 #endif
 
+
+typedef vector<string> errors_t;
+extern errors_t error_stack;
+
+
+inline void push_error(string& msg)
+{
+  error_stack.push_back(msg);
+}
+
+
+inline void push_error(const char* msg)
+{
+  error_stack.push_back(string(msg));
+}
+
+
+inline void print_all()
+{
+  if (!error_stack.empty()) {
+    for (errors_t::iterator it = error_stack.begin(); it != error_stack.end(); ++it) {
+      error_log("%s\n", (*it).c_str());
+    }
+    error_stack.clear();
+  }
+}
+
+} // namespace log
+
+} // namespace imtools
+
 #endif // IMTOOLS_LOG_HXX
+
 // vim: et ts=2 sts=2 sw=2

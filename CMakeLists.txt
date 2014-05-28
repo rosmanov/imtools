@@ -42,7 +42,7 @@ ${LIBOPENCV_HIGHGUI_LIB}")
 
 set(LIBS ${LIBS} ${LIBOPENCV_LIBS} ${THREADS_LIBRARIES})
 
-set(common_src src/imtools.cxx src/exceptions.cxx)
+set(common_src src/imtools.cxx src/exceptions.cxx src/log.cxx)
 
 set(imtools_targets immerge)
 if (IMTOOLS_EXTRA)

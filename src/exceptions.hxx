@@ -60,7 +60,7 @@ class FileWriteErrorException: public ErrorException
 class LowMssimException: public ErrorException
 {
   public:
-    LowMssimException(double mssim, Rect& roi);
+    LowMssimException(double mssim, Rect& roi, string& filename);
     virtual ~LowMssimException() throw() {}
 };
 

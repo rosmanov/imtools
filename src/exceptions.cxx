@@ -28,13 +28,13 @@ FileWriteErrorException::FileWriteErrorException(string filename)
 }
 
 
-LowMssimException::LowMssimException(double mssim, Rect& roi)
+LowMssimException::LowMssimException(double mssim, Rect& roi, string& filename)
 {
   ostringstream ostr;
 
-  ostr << "Low MSSIM value (images considered different): " << mssim
-    << ", skipping region " << roi.width << "x" << roi.height
-    << " at " << roi.x << "," << roi.y;
+  ostr << filename << ": low MSSIM: " << mssim
+    << ", skipped " << roi.width << "x" << roi.height
+    << " @ " << roi.x << "," << roi.y;
 
   mMsg = ostr.str();
 }
