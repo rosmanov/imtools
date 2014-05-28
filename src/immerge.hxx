@@ -21,25 +21,6 @@
 #include "imtools.hxx"
 #include "immerge-vars.hxx"
 
-#define IMTOOLS_THREAD_FAILURE_VAL() g_thread_failure
-#define IMTOOLS_THREAD_FAILURE_SET(v)  \
-  do {                                 \
-    IT_LOCK(g_thread_failure_mutex);   \
-    g_thread_failure = (v);            \
-    IT_UNLOCK(g_thread_failure_mutex); \
-  } while (0)
-
-#define IMTOOLS_THREAD_FAILURE_CHECK(__ret) \
-  do {                                       \
-    IT_LOCK(g_thread_failure_mutex);         \
-    if (g_thread_failure) {                  \
-      IT_UNLOCK(g_thread_failure_mutex);     \
-      return __ret;                          \
-    }                                        \
-    IT_UNLOCK(g_thread_failure_mutex);       \
-  } while (0)
-
-
 #endif // IMTOOLS_IMMERGE_HXX
 
 // vim: et ts=2 sts=2 sw=2

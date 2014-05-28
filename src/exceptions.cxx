@@ -2,11 +2,26 @@
 
 using std::ostringstream;
 using std::string;
+using std::runtime_error;
 using cv::Mat;
 using cv::Point;
 
 namespace imtools
 {
+
+ErrorException::ErrorException(const char* format, ...)
+  : runtime_error("")
+{
+  if (format) {
+    va_list args;
+    va_start(args, format);
+    char message[1024];
+    int message_len = vsnprintf(message, sizeof(message), format, args);
+    mMsg = string(message, message_len);
+    va_end(args);
+  }
+}
+
 
 TemplateOutOfBoundsException::TemplateOutOfBoundsException(const Mat& tplMat, const Mat& outMat, const Rect& roi)
 {
@@ -47,7 +62,7 @@ InvalidCliArgException::InvalidCliArgException(const char* format, ...)
     va_start(args, format);
     char message[1024];
     int message_len = vsnprintf(message, sizeof(message), format, args);
-    mMsg = std::string(message, message_len);
+    mMsg = string(message, message_len);
     va_end(args);
   }
 }

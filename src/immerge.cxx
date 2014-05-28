@@ -36,21 +36,6 @@ cleanup(bool is_error)
   IT_MUTEX_DESTROY(g_process_images_mutex);
   IT_MUTEX_DESTROY(g_work_mutex);
   IT_ATTR_DESTROY(g_pta);
-
-  // Strict mode cleanup
-
-  if (is_error && g_strict) {
-
-    if (g_generated_files.size()) {
-      for (images_vector_t::iterator it = g_generated_files.begin(); it != g_generated_files.end(); ++it) {
-        const char* filename = (*it).c_str();
-        if (file_exists(filename)) {
-          verbose_log2("Removing %s\n", filename);
-          unlink(filename);
-        }
-      }
-    }
-  }
 }
 
 
@@ -159,12 +144,11 @@ load_images(const int argc, char** argv)
 static void*
 apply_bounding_box(void* arg)
 {
+  bool       success = true;
   box_arg_t *pbarg;
   cv::Mat    old_tpl_img;
   cv::Mat    new_tpl_img;
   cv::Point  match_loc;
-
-  IMTOOLS_THREAD_FAILURE_CHECK(NULL);
 
   pbarg = (box_arg_t *) arg;
   assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
@@ -204,20 +188,21 @@ apply_bounding_box(void* arg)
     patch(*pbarg->out_img, g_new_img, new_tpl_img, roi);
 
   } catch (ErrorException& e) {
-    IMTOOLS_THREAD_FAILURE_SET(true);
+    success = false;
     log::push_error(e.what());
   } catch (...) {
-    IMTOOLS_THREAD_FAILURE_SET(true);
     log::push_error("Caught unknown exception!\n");
+    success = false;
   }
 
-  return NULL;
+  return (void*)(success);
 }
 
 
-static void
+static bool
 process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 {
+  bool success = true;
   cv::Mat old_img, out_img, old_tpl_img, new_tpl_img;
   string merged_filename;
 
@@ -227,8 +212,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
   old_img = cv::imread(filename, 1);
   if (old_img.empty()) {
-    strict_log(g_strict, "skipping empty image: %s\n", filename.c_str());
-    return;
+    throw ErrorException("empty image skipped: " + filename);
   }
 
   // Prepare matrix for current target image
@@ -247,6 +231,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
 #if defined(IMTOOLS_THREADS)
   if (n_boxes) {
+    void* thread_result;
     auto pbarg = new box_arg_t[n_boxes];
 
     for (int i = 0; i < n_boxes; i++) {
@@ -266,7 +251,11 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
     for (int i = 0; i < n_boxes; i++) {
       debug_log("joining thread #%ld\n", pbarg[i].thread_id);
-      pthread_join(pbarg[i].thread_id, NULL);
+      pthread_join(pbarg[i].thread_id, &thread_result);
+      if (!thread_result) {
+        success = false;
+        // No break. We have to wait for all the threads
+      }
     }
 
     delete [] pbarg;
@@ -281,12 +270,18 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
     pbarg.out_img = &out_img;
     pbarg.filename = &filename;
 
-    apply_bounding_box(&pbarg);
+    if (!apply_bounding_box(&pbarg)) {
+      success = false;
+      break;
+    }
   }
 #endif // IMTOOLS_THREADS
 
-  log::print_all();
-  IMTOOLS_THREAD_FAILURE_CHECK(/* void */);
+  if (!success) {
+    log::warn_all();
+    error_log("%s: failed to process, skipping\n", filename.c_str());
+    return success;
+  }
 
   // Save merged matrix to filesystem
 
@@ -306,9 +301,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
   verbose_log("[Output] file:%s boxes:%d\n", merged_filename.c_str(), n_boxes);
 
-  if (g_strict) {
-    g_generated_files.push_back(merged_filename);
-  }
+  return success;
 }
 
 
@@ -319,21 +312,23 @@ process_image_thread_func(void* arg)
   image_process_arg_t* ipa = (image_process_arg_t*)arg;
 
   try {
-    process_image(*ipa->filename, *ipa->diff_img, ipa->out_filename);
+    if (!process_image(*ipa->filename, *ipa->diff_img, ipa->out_filename))
+      return NULL;
   } catch (ErrorException& e) {
-    error_log("%s\n", e.what());
-    IMTOOLS_THREAD_FAILURE_SET(true);
-    pthread_exit(NULL);
+    warning_log("%s\n", e.what());
+    return NULL;
   }
 
-  return NULL;
+  return (void*)1;
 }
 #endif
 
 
-static void
+static bool
 merge()
 {
+  bool success = true;
+
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
@@ -358,6 +353,7 @@ merge()
   int n_images = g_dst_images.size();
   auto img_proc_args = new image_process_arg_t[n_images];
   int i = 0;
+  void *thread_result;
 
   for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it, ++i) {
     IT_LOCK(g_process_images_mutex);
@@ -377,18 +373,29 @@ merge()
 
   for (int i = 0; i < n_images; i++) {
     debug_log("(images) joining thread #%ld\n", img_proc_args[i].thread_id);
-    pthread_join(img_proc_args[i].thread_id, NULL);
+    pthread_join(img_proc_args[i].thread_id, &thread_result);
+    if (!thread_result) {
+      success = false;
+    }
   }
 
   delete [] img_proc_args;
 #else // no threads
   int i = 0;
   for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it, ++i) {
-    process_image(*it, diff_img, (g_pairs ? &g_out_images[i] : NULL));
+    try {
+      if (!process_image(*it, diff_img, (g_pairs ? &g_out_images[i] : NULL)))
+        success = false;
+    } catch (ErrorException& e) {
+      warning_log("%s\n", e.what());
+      success = false;
+    }
   }
 #endif // IMTOOLS_THREADS
 
   debug_timer_end(t1, t2, merge);
+
+  return (success);
 }
 
 
@@ -429,21 +436,21 @@ int main(int argc, char **argv)
           {
             struct stat st;
             if (stat(optarg, &st)) {
-              throw InvalidCliArgException("invalid output directory '%s', %s.\n", optarg, strerror(errno));
+              throw InvalidCliArgException("invalid output directory '%s', %s.", optarg, strerror(errno));
             }
             if (!S_ISDIR(st.st_mode)) {
-              throw InvalidCliArgException("%s is not a directory.\n", optarg);
+              throw InvalidCliArgException("%s is not a directory.", optarg);
             }
             g_out_dir = optarg;
             break;
           }
 
         case 'm':
-          save_int_opt_arg(g_mod_threshold, "Invalid modification threshold\n");
+          save_int_opt_arg(g_mod_threshold, "Invalid modification threshold");
           break;
 
         case 'L':
-          save_int_opt_arg(g_min_threshold, "Invalid min threshold\n");
+          save_int_opt_arg(g_min_threshold, "Invalid min threshold");
           break;
 
         case 'H':
@@ -451,11 +458,11 @@ int main(int argc, char **argv)
           break;
 
         case 'b':
-          save_int_opt_arg(g_min_boxes_threshold, "Invalid min bound boxes threshold\n");
+          save_int_opt_arg(g_min_boxes_threshold, "Invalid min bound boxes threshold");
           break;
 
         case 'B':
-          save_int_opt_arg(g_max_boxes_threshold, "Invalid max bound boxes threshold\n");
+          save_int_opt_arg(g_max_boxes_threshold, "Invalid max bound boxes threshold");
           break;
 
         case 'v':
@@ -526,20 +533,18 @@ int main(int argc, char **argv)
 
     // Merge the difference into the target images
 
-    merge();
+    if (!merge()) {
+      exit_code = 1;
+    }
 
-  } catch (imtools::ErrorException& e) {
+  } catch (ErrorException& e) {
     error_log("%s\n", e.what());
     exit_code = 1;
   } catch (cv::Exception& e) {
     error_log("CV error: %s\n", e.what());
     exit_code = 1;
   } catch (...) {
-    error_log("Unknown error!!! Please fail a bug.\n");
-    exit_code = 1;
-  }
-
-  if (g_strict && IMTOOLS_THREAD_FAILURE_VAL()) {
+    error_log("Unknown error!!! Please file a bug.\n");
     exit_code = 1;
   }
 

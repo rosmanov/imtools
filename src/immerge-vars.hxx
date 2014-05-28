@@ -35,23 +35,16 @@ int g_strict = 0;
 cv::Mat g_old_img;
 cv::Mat g_new_img;
 
-// Whether some (thread) function failed
-// (we don't cancel threads in order to avoid possible memory leaks etc.).
-// We use this flag for non-threaded version, too.
-bool g_thread_failure = false;
 
 #ifdef IMTOOLS_THREADS
 pthread_mutex_t g_work_mutex;
 pthread_mutex_t g_process_images_mutex;
-// Mutex for g_thread_failure variable
-pthread_mutex_t g_thread_failure_mutex;
 pthread_attr_t g_pta;
 #endif // if threads
 
 // Destination images
 images_vector_t g_dst_images;
 images_vector_t g_out_images;
-images_vector_t g_generated_files;
 
 std::vector<int> g_compression_params;
 
@@ -69,9 +62,9 @@ const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 " -h, --help                 Display this help.\n"
 " -v, --verbose              Turn on verbose output. Can be used multiple times\n"
 "                            to increase verbosity (e.g. -vv). Default: off.\n"
-" -s, --strict               Turn on warnings into errors. Can be used multiple times\n"
+" -s, --strict               Turn some warnings into fatal errors. Can be used multiple times\n"
 "                            to increase strictness. Double value (-ss) will enable extra\n"
-"                            structural similarity checks for each patch. Default: off.\n"
+"                            structural similarity checks (MSSIM) for each patch. Default: off.\n"
 " -n, --new-image            New image. Required.\n"
 " -o, --old-image            Old image. Required.\n"
 " -d, --out-dir              Output directory. Default: current directory.\n"
@@ -83,7 +76,7 @@ const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 " -b, --boxes-min-threshold  Min. threshold for bound boxes. Default: %d\n"
 " -B, --boxes-max-threshold  Max. threshold for bound boxes. Default: %d\n\n"
 "EXAMPLE:\n"
-"%s -o old.png -n new.png -d/tmp old1.png old2.png\n";
+"%s -o old.png -n new.png -p old1.png out1.png old2.png out2.png\n";
 
 const char *g_short_options = "hvsn:o:d::pm::L::H::b::B::";
 

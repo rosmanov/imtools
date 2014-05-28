@@ -48,14 +48,13 @@ namespace log
 #define error_log(...) fprintf(stderr, "[Error] " __VA_ARGS__)
 #define warning_log(...) fprintf(stderr, "[Warning] " __VA_ARGS__)
 
-#define strict_log(is_strict, ...) \
-  do {                             \
-    if ((is_strict)) {             \
-      error_log(__VA_ARGS__);      \
-      throw ErrorException();      \
-    } else {                       \
-      warning_log(__VA_ARGS__);    \
-    }                              \
+#define strict_log(is_strict, ...)       \
+  do {                                   \
+    if ((is_strict)) {                   \
+      throw ErrorException(__VA_ARGS__); \
+    } else {                             \
+      warning_log(__VA_ARGS__);          \
+    }                                    \
   } while(0)
 
 #ifdef IMTOOLS_DEBUG
@@ -92,11 +91,11 @@ inline void push_error(const char* msg)
 }
 
 
-inline void print_all()
+inline void warn_all()
 {
   if (!error_stack.empty()) {
     for (errors_t::iterator it = error_stack.begin(); it != error_stack.end(); ++it) {
-      error_log("%s\n", (*it).c_str());
+      warning_log("%s\n", (*it).c_str());
     }
     error_stack.clear();
   }
