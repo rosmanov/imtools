@@ -484,18 +484,18 @@ int main(int argc, char **argv)
         case '?':
           // unrecognized option
           usage(true);
-          exit(1);
+          exit(2);
 
         default:
           error_log("getopt returned character code 0%o\n", next_option);
           usage(true);
-          exit(1);
+          exit(2);
       }
     } while (next_option != -1);
   } catch (imtools::InvalidCliArgException& e) {
     error_log("%s\n", e.what());
     usage(true);
-    exit(1);
+    exit(2);
   }
 
 
