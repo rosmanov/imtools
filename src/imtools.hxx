@@ -35,7 +35,13 @@
 #include "log.hxx"
 #include "exceptions.hxx"
 
-#define IMTOOLS_VERSION "1.0.3-dev"
+using cv::Mat;
+using cv::Rect;
+using cv::Scalar;
+using cv::Point;
+
+
+#define IMTOOLS_VERSION "1.0.3-r1"
 
 #ifdef IMTOOLS_DEBUG
 # define IMTOOLS_BUILD_TYPE "debug"
@@ -52,29 +58,10 @@
 #define IMTOOLS_FULL_NAME "ImTools " IMTOOLS_VERSION " (" IMTOOLS_BUILD_TYPE ") (" IMTOOLS_SUFFIX ")"
 #define IMTOOLS_COPYRIGHT "Copyright (C) 2014 - Ruslan Osmanov <rrosmanov@gmail.com>"
 
-#if 0
-
-#define save_int_opt_arg(__arg, ...)           \
-{                                              \
-  if (optarg) {                                \
-    char *optarg_end;                          \
-    (__arg) = strtol(optarg, &optarg_end, 10); \
-    if (*optarg_end != '\0' || (__arg) < 0) {  \
-      error_log(__VA_ARGS__);                  \
-      usage(true);                             \
-    }                                          \
-  } else {                                     \
-    error_log(__VA_ARGS__);                    \
-    usage(true);                               \
-  }                                            \
-}
-#else
 #define save_int_opt_arg(__arg, ...)              \
 {                                                 \
   (__arg) = get_int_opt_arg(optarg, __VA_ARGS__); \
 }
-
-#endif
 
 
 namespace imtools {
@@ -84,7 +71,7 @@ namespace imtools {
 extern int verbose;
 
 typedef unsigned int uint_t;
-typedef cv::Rect bound_box_t;
+typedef Rect bound_box_t;
 typedef std::vector<bound_box_t> bound_box_vector_t;
 typedef std::vector<std::string> images_vector_t;
 
@@ -106,8 +93,8 @@ enum {
 struct box_arg_t {
   pthread_t    thread_id;
   bound_box_t *box;
-  cv::Mat     *old_img;
-  cv::Mat     *out_img;
+  Mat     *old_img;
+  Mat     *out_img;
   std::string *filename;
 };
 
@@ -115,7 +102,7 @@ struct image_process_arg_t {
   pthread_t    thread_id;
   std::string *filename;
   std::string *out_filename;
-  cv::Mat     *diff_img;
+  Mat     *diff_img;
 };
 
 inline bool
@@ -135,32 +122,30 @@ file_exists(const std::string& filename)
 
 int get_int_opt_arg(const char* optarg, const char* format, ...);
 
-
 // Computes difference between old_img and new_img. The matrix values lower than mod_threshold are
 // cut down to zeros. Result (1-channel binary image) is stored in out_img.
-void diff(cv::Mat& out_img, const cv::Mat& old_img, const cv::Mat& new_img,
+void diff(Mat& out_img, const Mat& old_img, const Mat& new_img,
     const int mod_threshold = THRESHOLD_MOD);
 
 /// Can be used to reduce noise
-void blur(cv::Mat& target, const blur_type type);
+void blur(Mat& target, const blur_type type);
 
 /// Reduces noise
-void threshold(cv::Mat& target, const int threshold = THRESHOLD_MIN,
+void threshold(Mat& target, const int threshold = THRESHOLD_MIN,
     const int max_threshold = THRESHOLD_MAX);
 
-void match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl);
+void match_template(Point& match_loc, const Mat& img, const Mat& tpl);
 
-/// Patch IMG_MAT at position (X, Y) with contents of TPL_MAT.
-/// Result is stored in OUT_MAT. OUT_MAT must be of the same size and type as IMG_MAT.
-void patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const cv::Rect& roi);
+/// Patch OUT_MAT at position (X, Y) with contents of TPL_MAT.
+void patch(Mat& out_mat, const Mat& tpl_mat, const Rect& roi);
 
 /// Find bounding boxes in mask (can be obtained with diff() + threshold())
-void bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask,
+void bound_boxes(bound_box_vector_t& boxes, const Mat& mask,
     int min_threshold = THRESHOLD_BOXES_MIN, int max_threshold = THRESHOLD_BOXES_MAX);
 
 /// Computes structural similarity coefficient, i.e. similarity between i1 and i2 matrices.
 /// Each item of the return value is a number between 0 and 1, where 1 is the perfect match.
-cv::Scalar get_MSSIM(const cv::Mat& i1, const cv::Mat& i2);
+Scalar get_MSSIM(const Mat& i1, const Mat& i2);
 
 } // namespace imtools
 

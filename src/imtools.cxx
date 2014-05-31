@@ -16,6 +16,13 @@
 
 #include "imtools.hxx"
 
+using std::string;
+using std::vector;
+using cv::Mat;
+using cv::Rect;
+using cv::Point;
+using cv::Size;
+
 namespace imtools {
 
 int verbose = 0;
@@ -36,13 +43,13 @@ get_int_opt_arg(const char* optarg, const char* format, ...)
 
 err:
   if (format) {
-    std::string error;
+    string error;
 
     va_list args;
     va_start(args, format);
     char message[1024];
     int message_len = vsnprintf(message, sizeof(message), format, args);
-    error = std::string(message, message_len);
+    error = string(message, message_len);
     va_end(args);
 
     throw InvalidCliArgException(error);
@@ -53,7 +60,7 @@ err:
 
 
 void
-diff(cv::Mat& out_img, const cv::Mat& old_img, const cv::Mat& new_img, const int mod_threshold)
+diff(Mat& out_img, const Mat& old_img, const Mat& new_img, const int mod_threshold)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
@@ -74,7 +81,7 @@ diff(cv::Mat& out_img, const cv::Mat& old_img, const cv::Mat& new_img, const int
 
 
 void
-blur(cv::Mat& target, const blur_type type)
+blur(Mat& target, const blur_type type)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
@@ -84,11 +91,11 @@ blur(cv::Mat& target, const blur_type type)
       break;
 
     case BLUR:
-      cv::blur(target, target, cv::Size(3, 3));
+      cv::blur(target, target, Size(3, 3));
       break;
 
     case BLUR_GAUSS:
-      cv::GaussianBlur(target, target, cv::Size(3, 3), 10);
+      cv::GaussianBlur(target, target, Size(3, 3), 10);
       break;
 
     case BLUR_MEDIAN:
@@ -96,7 +103,7 @@ blur(cv::Mat& target, const blur_type type)
       break;
 
     default:
-      throw std::runtime_error(std::string("Invalid blur type"));
+      throw ErrorException("Invalid blur type");
   }
 
   debug_timer_end(t1, t2, imtools::blur);
@@ -104,7 +111,7 @@ blur(cv::Mat& target, const blur_type type)
 
 
 void
-threshold(cv::Mat& target, const int threshold, const int max_threshold)
+threshold(Mat& target, const int threshold, const int max_threshold)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
@@ -118,12 +125,12 @@ threshold(cv::Mat& target, const int threshold, const int max_threshold)
 
 
 void
-match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl)
+match_template(Point& match_loc, const Mat& img, const Mat& tpl)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
-  cv::Mat result;
+  Mat result;
   int match_method = CV_TM_SQDIFF;
 
   int result_cols = img.cols - tpl.cols + 1;
@@ -131,13 +138,13 @@ match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl)
   result.create(result_cols, result_rows, CV_32FC1);
 
   cv::matchTemplate(img, tpl, result, match_method);
-  cv::normalize(result, result, 0, 1, cv::NORM_MINMAX, -1, cv::Mat());
+  cv::normalize(result, result, 0, 1, cv::NORM_MINMAX, -1, Mat());
 
   // Localize the best match with minMaxLoc
 
   double min_val, max_val;
-  cv::Point min_loc, max_loc;
-  cv::minMaxLoc(result, &min_val, &max_val, &min_loc, &max_loc, cv::Mat());
+  Point min_loc, max_loc;
+  cv::minMaxLoc(result, &min_val, &max_val, &min_loc, &max_loc, Mat());
 
   // For SQDIFF and SQDIFF_NORMED, the best matches are lower values. For all
   // the other methods, the higher the better
@@ -152,23 +159,18 @@ match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl)
 
 
 void
-patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const cv::Rect& roi)
+patch(Mat& out_mat, const Mat& tpl_mat, const Rect& roi)
 {
   debug_log("imtools::patch(), x: %d, y: %d\n", roi.x, roi.y);
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
   if (out_mat.empty()) {
-    throw std::runtime_error(std::string("Output matrix is empty"));
+    throw ErrorException("Output matrix is empty");
   }
   if (tpl_mat.empty()) {
-    throw std::runtime_error(std::string("Input template matrix is empty"));
+    throw ErrorException("Input template matrix is empty");
   }
-
-  assert(!img_mat.empty());
-  //assert(out_mat.rows >= img_mat.rows && out_mat.cols >= img_mat.cols);
-  assert(out_mat.type() == img_mat.type());
-  assert(img_mat.rows >= tpl_mat.rows && img_mat.cols >= tpl_mat.cols);
 
   if ((roi.x + tpl_mat.cols) > out_mat.cols
       || (roi.y + tpl_mat.rows) > out_mat.rows)
@@ -177,13 +179,10 @@ patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const cv
   }
 
   // Region of interest
-  //cv::Rect roi = cv::Rect(pt.x, pt.y, tpl_mat.cols, tpl_mat.rows);
-
-  // Output matrix should be prepared already.
-  // out_mat = img_mat.clone();
+  //Rect roi = Rect(pt.x, pt.y, tpl_mat.cols, tpl_mat.rows);
 
   // Extract ROI from the output image as a reference
-  cv::Mat out_mat_roi = out_mat(roi);
+  Mat out_mat_roi = out_mat(roi);
 
   // Overwrite the ROI
   tpl_mat.copyTo(out_mat_roi);
@@ -193,14 +192,14 @@ patch(cv::Mat& out_mat, const cv::Mat& img_mat, const cv::Mat& tpl_mat, const cv
 
 
 void
-bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask, int min_threshold, int max_threshold)
+bound_boxes(bound_box_vector_t& boxes, const Mat& mask, int min_threshold, int max_threshold)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
-  cv::Mat mask_gray, threshold_output;
-  std::vector<std::vector<cv::Point> > contours;
-  std::vector<cv::Vec4i> hierarchy;
+  Mat mask_gray, threshold_output;
+  vector<vector<Point> > contours;
+  vector<cv::Vec4i> hierarchy;
 
   assert(min_threshold >= 0 && min_threshold <= max_threshold);
 
@@ -213,21 +212,21 @@ bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask, int min_threshold, i
     mask_gray = mask;
   }
   debug_log0("bound_boxes: blur() w/ 15x15 kernel\n");
-  cv::blur(mask_gray, mask_gray, cv::Size(15, 15));
+  cv::blur(mask_gray, mask_gray, Size(15, 15));
 
   // Detect edges
   debug_log("bound_boxes: threshold(%d, %d)\n", min_threshold, max_threshold);
   cv::threshold(mask_gray, threshold_output, min_threshold, max_threshold, cv::THRESH_BINARY);
 
-  cv::findContours(threshold_output, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
+  cv::findContours(threshold_output, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
   // Approximate contours to polygons, get bounding rects
-  std::vector<std::vector<cv::Point> > contours_poly(contours.size());
+  vector<vector<Point> > contours_poly(contours.size());
   boxes.reserve(contours.size());
   debug_log("bound_boxes - reserved %ld\n", contours.size());
   for (size_t i = 0; i < contours.size(); ++i) {
-    cv::approxPolyDP(cv::Mat(contours[i]), contours_poly[i], 3, true);
-    boxes.push_back(cv::boundingRect(cv::Mat(contours_poly[i])));
+    cv::approxPolyDP(Mat(contours[i]), contours_poly[i], 3, true);
+    boxes.push_back(cv::boundingRect(Mat(contours_poly[i])));
     debug_log("bound_boxes - boxes[i] = %dx%d\n", boxes[i].x, boxes[i].y);
   }
   debug_log("bound_boxes - size = %ld\n", boxes.size());
@@ -239,40 +238,40 @@ bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask, int min_threshold, i
 /// Computes structural similarity coefficient.
 /// The code is borrowed from
 /// http://docs.opencv.org/doc/tutorials/highgui/video-input-psnr-ssim/video-input-psnr-ssim.html#image-similarity-psnr-and-ssim
-cv::Scalar get_MSSIM(const cv::Mat& i1, const cv::Mat& i2)
+cv::Scalar get_MSSIM(const Mat& i1, const Mat& i2)
 {
   const double C1 = 6.5025, C2 = 58.5225;
   int d           = CV_32F;
 
-  cv::Mat I1, I2;
+  Mat I1, I2;
   i1.convertTo(I1, d); // cannot calculate on one byte large values
   i2.convertTo(I2, d);
 
-  cv::Mat I2_2  = I2.mul(I2); // I2^2
-  cv::Mat I1_2  = I1.mul(I1); // I1^2
-  cv::Mat I1_I2 = I1.mul(I2); // I1 * I2
+  Mat I2_2  = I2.mul(I2); // I2^2
+  Mat I1_2  = I1.mul(I1); // I1^2
+  Mat I1_I2 = I1.mul(I2); // I1 * I2
 
 
-  cv::Mat mu1, mu2;
-  cv::GaussianBlur(I1, mu1, cv::Size(11, 11), 1.5);
-  cv::GaussianBlur(I2, mu2, cv::Size(11, 11), 1.5);
+  Mat mu1, mu2;
+  cv::GaussianBlur(I1, mu1, Size(11, 11), 1.5);
+  cv::GaussianBlur(I2, mu2, Size(11, 11), 1.5);
 
-  cv::Mat mu1_2   = mu1.mul(mu1);
-  cv::Mat mu2_2   = mu2.mul(mu2);
-  cv::Mat mu1_mu2 = mu1.mul(mu2);
+  Mat mu1_2   = mu1.mul(mu1);
+  Mat mu2_2   = mu2.mul(mu2);
+  Mat mu1_mu2 = mu1.mul(mu2);
 
-  cv::Mat sigma1_2, sigma2_2, sigma12;
+  Mat sigma1_2, sigma2_2, sigma12;
 
-  cv::GaussianBlur(I1_2, sigma1_2, cv::Size(11, 11), 1.5);
+  cv::GaussianBlur(I1_2, sigma1_2, Size(11, 11), 1.5);
   sigma1_2 -= mu1_2;
 
-  cv::GaussianBlur(I2_2, sigma2_2, cv::Size(11, 11), 1.5);
+  cv::GaussianBlur(I2_2, sigma2_2, Size(11, 11), 1.5);
   sigma2_2 -= mu2_2;
 
-  cv::GaussianBlur(I1_I2, sigma12, cv::Size(11, 11), 1.5);
+  cv::GaussianBlur(I1_I2, sigma12, Size(11, 11), 1.5);
   sigma12 -= mu1_mu2;
 
-  cv::Mat t1, t2, t3;
+  Mat t1, t2, t3;
 
   t1 = 2 * mu1_mu2 + C1;
   t2 = 2 * sigma12 + C2;
@@ -282,7 +281,7 @@ cv::Scalar get_MSSIM(const cv::Mat& i1, const cv::Mat& i2)
   t2 = sigma1_2 + sigma2_2 + C2;
   t1 = t1.mul(t2); // t1 =((mu1_2 + mu2_2 + C1).*(sigma1_2 + sigma2_2 + C2))
 
-  cv::Mat ssim_map;
+  Mat ssim_map;
   cv::divide(t3, t1, ssim_map); // ssim_map =  t3./t1;
 
   cv::Scalar mssim = cv::mean(ssim_map); // mssim = average of ssim map

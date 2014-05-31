@@ -27,9 +27,34 @@ using std::string;
 
 
 static void
-cleanup(bool is_error)
+init()
 {
-  verbose_log2("Cleanup...\n");
+  debug_log0("init()\n");
+
+  // Setup compression parameters
+
+  g_compression_params.push_back(CV_IMWRITE_PNG_STRATEGY);
+  g_compression_params.push_back(cv::IMWRITE_PNG_STRATEGY_FILTERED);
+  g_compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
+  g_compression_params.push_back(9/* 0 -none,  9 - full */);
+#if 0
+  // We don't force specific JPEG quality because the format is lossy.
+  g_compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
+  g_compression_params.push_back(90);
+#endif
+
+  // Initialize threading
+
+  IT_ATTR_INIT(g_pta);
+  IT_MUTEX_CREATE(g_work_mutex);
+  IT_MUTEX_CREATE(g_process_images_mutex);
+}
+
+
+static void
+cleanup()
+{
+  debug_log0("cleanup()\n");
 
   // Release resources allocated for threading
 
@@ -55,7 +80,7 @@ usage(bool is_error)
 }
 
 
-/// Loads images into memory
+/// Loads images specified by the CLI arguments into memory
 
 static void
 load_images(const int argc, char** argv)
@@ -63,25 +88,27 @@ load_images(const int argc, char** argv)
   // Load target images
 
   if (optind < argc) {
+    if (g_pairs) {
+      // ARGV is a list of input and output files: infile outfile infile2 outfile2 ...
 
-    if (g_pairs) { // IMAGES is a list of input and output files
       for (int i = 0; optind < argc;) {
         const char* filename = argv[optind++];
 
         if (i++ % 2 == 0) {
           if (i > MAX_MERGE_TARGETS) {
-            strict_log(g_strict, "max. number of targets exceeded: %d. Skipping the rest.\n", MAX_MERGE_TARGETS);
+            strict_log(g_strict, "max. number of targets exceeded: %d. "
+                "Skipping the rest.\n", MAX_MERGE_TARGETS);
             break;
           }
 
-          // input file
+          // Input file
           if (!file_exists(filename)) {
             strict_log(g_strict, "image %s doesn't exist.\n", filename);
             break;
           }
           g_dst_images.push_back(filename);
         } else {
-          // output file
+          // Output file
           g_out_images.push_back(filename);
         }
       }
@@ -92,11 +119,11 @@ load_images(const int argc, char** argv)
         strict_log(g_strict, "%s file have no pair! Skipping.\n", g_dst_images.back().c_str());
         g_dst_images.pop_back();
       }
-      assert(g_dst_images.size() == g_out_images.size());
-    } else { // IMAGES is a list of output files
+    } else { // ARGV is a list of output files
       for (int i = 0; optind < argc; ++i) {
         if (i >= MAX_MERGE_TARGETS) {
-          strict_log(g_strict, "max. number of targets exceeded: %d. Skipping the rest.\n", MAX_MERGE_TARGETS);
+          strict_log(g_strict, "max. number of targets exceeded: %d. "
+              "Skipping the rest.\n", MAX_MERGE_TARGETS);
           break;
         }
 
@@ -128,17 +155,15 @@ load_images(const int argc, char** argv)
   g_new_img = cv::imread(g_new_image_filename, 1);
 
   if (g_old_img.size() != g_new_img.size()) {
-    strict_log(g_strict, "Input images have different dimensions.\n");
-    exit(1);
+    throw ErrorException("Input images have different dimensions");
   }
   if (g_old_img.type() != g_new_img.type()) {
-    strict_log(g_strict, "Input images have different types.\n");
-    exit(1);
+    throw ErrorException("Input images have different types");
   }
 }
 
 
-/// Thread routine) applying a bounding box to the output matrix.
+/// Thread routine a patch indicated by bounding box to the output matrix.
 /// @note Is called directly, if there is no threads support.
 
 static void*
@@ -185,19 +210,25 @@ apply_bounding_box(void* arg)
     // at location (match_loc.x, match_loc.y).
     // The result will be stored in OUT_IMG.
 
-    patch(*pbarg->out_img, g_new_img, new_tpl_img, roi);
-
+    patch(*pbarg->out_img, new_tpl_img, roi);
   } catch (ErrorException& e) {
     success = false;
     log::push_error(e.what());
   } catch (...) {
-    log::push_error("Caught unknown exception!\n");
     success = false;
+    log::push_error("Caught unknown exception!\n");
   }
 
   return (void*)(success);
 }
 
+
+/// Applies all patches to the target image
+/// FILENAME - target filename.
+/// DIFF_IMG - binary image with information about differences between
+/// original and modified images, where modified spots have high values.
+/// OUT_FILENAME - optional output filename. If is NULL, result is
+/// written to the output directory.
 
 static bool
 process_image(string& filename, cv::Mat& diff_img, string* out_filename)
@@ -254,7 +285,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
       pthread_join(pbarg[i].thread_id, &thread_result);
       if (!thread_result) {
         success = false;
-        // No break. We have to wait for all the threads
+        // No break. We have to wait for the rest of threads.
       }
     }
 
@@ -306,6 +337,8 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
 
 #ifdef IMTOOLS_THREADS
+/// Thread routine calling PROCESS_IMAGE function
+
 static void*
 process_image_thread_func(void* arg)
 {
@@ -325,7 +358,7 @@ process_image_thread_func(void* arg)
 
 
 static bool
-merge()
+run()
 {
   bool success = true;
 
@@ -352,8 +385,8 @@ merge()
 #if defined(IMTOOLS_THREADS)
   int n_images = g_dst_images.size();
   auto img_proc_args = new image_process_arg_t[n_images];
+  void* thread_result;
   int i = 0;
-  void *thread_result;
 
   for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it, ++i) {
     IT_LOCK(g_process_images_mutex);
@@ -393,7 +426,7 @@ merge()
   }
 #endif // IMTOOLS_THREADS
 
-  debug_timer_end(t1, t2, merge);
+  debug_timer_end(t1, t2, run);
 
   return (success);
 }
@@ -498,7 +531,6 @@ int main(int argc, char **argv)
     exit(2);
   }
 
-
   debug_log("out-dir: %s\n", g_out_dir.c_str());
   debug_log("mod-threshold: %d\n", g_mod_threshold);
   debug_log("min-threshold: %d\n", g_min_threshold);
@@ -506,22 +538,7 @@ int main(int argc, char **argv)
   debug_log("min-boxes-threshold: %d\n", g_min_boxes_threshold);
   debug_log("max-boxes-threshold: %d\n", g_max_boxes_threshold);
 
-  // Setup compression parameters
-
-  g_compression_params.push_back(CV_IMWRITE_PNG_STRATEGY);
-  g_compression_params.push_back(cv::IMWRITE_PNG_STRATEGY_FILTERED);
-  g_compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
-  g_compression_params.push_back(9/* 0 -none,  9 - full */);
-#if 0
-  g_compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
-  g_compression_params.push_back(90);
-#endif
-
-  // Initialize threading
-
-  IT_ATTR_INIT(g_pta);
-  IT_MUTEX_CREATE(g_work_mutex);
-  IT_MUTEX_CREATE(g_process_images_mutex);
+  init();
 
   try {
     // Load images into memory
@@ -531,12 +548,9 @@ int main(int argc, char **argv)
     load_images(argc, argv);
     debug_timer_end(t1, t2, load_images());
 
-    // Merge the difference into the target images
-
-    if (!merge()) {
+    if (!run()) {
       exit_code = 1;
     }
-
   } catch (ErrorException& e) {
     error_log("%s\n", e.what());
     exit_code = 1;
@@ -548,7 +562,7 @@ int main(int argc, char **argv)
     exit_code = 1;
   }
 
-  cleanup(exit_code);
+  cleanup();
 
   return exit_code;
 }
