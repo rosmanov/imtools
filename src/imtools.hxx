@@ -41,7 +41,7 @@ using cv::Scalar;
 using cv::Point;
 
 
-#define IMTOOLS_VERSION "1.0.3-r1"
+#define IMTOOLS_VERSION "1.0.3-r2"
 
 #ifdef IMTOOLS_DEBUG
 # define IMTOOLS_BUILD_TYPE "debug"
@@ -91,10 +91,10 @@ enum {
 };
 
 struct box_arg_t {
-  pthread_t    thread_id;
+  pthread_t   thread_id;
   bound_box_t *box;
-  Mat     *old_img;
-  Mat     *out_img;
+  Mat         *old_img;
+  Mat         *out_img;
   std::string *filename;
 };
 

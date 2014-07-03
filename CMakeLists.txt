@@ -6,7 +6,7 @@ option(IMTOOLS_DEBUG "Enable debugging support in ImTools" OFF)
 # -D IMTOOLS_THREADS:STRING=ON
 option(IMTOOLS_THREADS "Enable threading" ON)
 # -D IMTOOLS_EXTRA:STRING=OFF
-option(IMTOOLS_BOUND_BOXES "Enable extra tools" OFF)
+option(IMTOOLS_EXTRA "Enable extra tools" OFF)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})

@@ -222,6 +222,21 @@ apply_bounding_box(void* arg)
   return (void*)(success);
 }
 
+/// Checks if box is suspiciously large (sometimes opencv can produce bounding boxes
+/// embracing smaller boxes, or even entire image!). Looks like OpenCV bug. It shouldn't
+/// return nested boxes!
+static inline bool
+_is_huge_bound_box(const bound_box_t& box, const Mat& out_img)
+{
+  double box_rel_size = box.area() * 100 / out_img.size().area();
+  bool result = (box_rel_size > MAX_BOUND_BOX_SIZE_REL);
+  if (result) {
+    warning_log("Bounding box is too large: %dx%d (%f%%)\n",
+        box.width, box.height, box_rel_size);
+  }
+  return result;
+}
+
 
 /// Applies all patches to the target image
 /// FILENAME - target filename.
@@ -269,23 +284,30 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
       IT_LOCK(g_work_mutex);
       debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
 
-      pbarg[i].box = &boxes[i];
-      pbarg[i].old_img = &old_img;
-      pbarg[i].out_img = &out_img;
-      pbarg[i].filename = &filename;
+      if (!_is_huge_bound_box(boxes[i], out_img)) {
+        pbarg[i].box = &boxes[i];
+        pbarg[i].old_img = &old_img;
+        pbarg[i].out_img = &out_img;
+        pbarg[i].filename = &filename;
 
-      pthread_create(&pbarg[i].thread_id, &g_pta, apply_bounding_box, &pbarg[i]);
+        pthread_create(&pbarg[i].thread_id, &g_pta, apply_bounding_box, &pbarg[i]);
+      } else {
+        pbarg[i].thread_id = 0;
+      }
+
       IT_UNLOCK(g_work_mutex);
     }
 
     // Wait until threads are finished
 
     for (int i = 0; i < n_boxes; i++) {
-      debug_log("joining thread #%ld\n", pbarg[i].thread_id);
-      pthread_join(pbarg[i].thread_id, &thread_result);
-      if (!thread_result) {
-        success = false;
-        // No break. We have to wait for the rest of threads.
+      if (pbarg[i].thread_id) {
+        debug_log("joining thread #%ld\n", pbarg[i].thread_id);
+        pthread_join(pbarg[i].thread_id, &thread_result);
+        if (!thread_result) {
+          success = false;
+          // No break. We have to wait for the rest of threads.
+        }
       }
     }
 
@@ -294,6 +316,10 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 #else // no threads
   for (int i = 0; i < n_boxes; i++) {
     debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
+
+    if (_is_huge_bound_box(boxes[i], out_img)) {
+      continue;
+    }
 
     box_arg_t pbarg;
     pbarg.box = &boxes[i];

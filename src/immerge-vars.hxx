@@ -13,6 +13,14 @@ const int MAX_MERGE_TARGETS = 100;
 /// See http://docs.opencv.org/doc/tutorials/highgui/video-input-psnr-ssim/video-input-psnr-ssim.html#image-similarity-psnr-and-ssim
 const double MIN_MSSIM = 0.5;
 
+/// Max. size of a bounding box relative to original image in percents
+/// With this threshold we avoid applying really large patches, which probably
+/// embrace a set of smaller bounding boxes (looks like OpenCV bug!)
+/// Instead of using this threshold, we might calculate intersections of the
+/// bounding boxes, then exclude those containing smaller boxes. However, we'll stick
+/// with this simple approach for now.
+const int MAX_BOUND_BOX_SIZE_REL = 70;
+
 const char* g_program_name;
 
 int g_mod_threshold       = THRESHOLD_MOD;
