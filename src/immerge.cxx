@@ -163,54 +163,65 @@ load_images(const int argc, char** argv)
 }
 
 
-/// Thread routine a patch indicated by bounding box to the output matrix.
+/// Thread routine applying a patch indicated by bounding box to the output matrix.
 /// @note Is called directly, if there is no threads support.
-
 static void*
 apply_bounding_box(void* arg)
 {
-  bool       success = true;
-  box_arg_t *pbarg;
-  cv::Mat    old_tpl_img;
-  cv::Mat    new_tpl_img;
-  cv::Point  match_loc;
+  bool         success       = true;
+  box_arg_t   *pbarg;
+  Mat          old_tpl_img;
+  Mat          new_tpl_img;
+  Point        match_loc       , match_loc_new;
+  Rect         roi             , roi_new;
+  double       avg_mssim;
+  double       avg_mssim_new;
+  bound_box_t *box;
 
   pbarg = (box_arg_t *) arg;
   assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
+  box = pbarg->box;
+
+  debug_log("apply_bounding_box: %dx%d @ %d;%d\n",
+      box->width, box->height, box->x, box->y);
 
   try {
-    // Get a part of original image which had been changed
-    // using the next bounding box as a mask
+    // Modified and original parts corresponding to the current bounding box
 
-    old_tpl_img = cv::Mat(g_old_img, *pbarg->box);
+    new_tpl_img = Mat(g_new_img, *box);
+    old_tpl_img = Mat(g_old_img, *box);
+#ifdef IMTOOLS_DEBUG
+    std::ostringstream ostr;
+    ostr << "new_tpl_img_" << box->width << "x" << box->height << "@" << box->x << "_" << box->y << ".jpg";
+    cv::imwrite(ostr.str(), new_tpl_img);
+    ostr.str("");
+    ostr << "old_tpl_img_" << box->width << "x" << box->height << "@" << box->x << "_" << box->y << ".jpg";
+    cv::imwrite(ostr.str(), old_tpl_img);
+#endif
 
-    // Find location on OLD_IMG which is similar to OLD_TPL_IMG
+    // Find likely locations of the modified/original parts on the currently processed image
 
-    match_template(match_loc, *pbarg->old_img, old_tpl_img);
+    match_template(match_loc_new, *pbarg->old_img, new_tpl_img);
+    match_template(match_loc,     *pbarg->old_img, old_tpl_img);
 
-    // Now get modified part corresponding to current box
+    // Get rectangles of the bounding boxes
 
-    new_tpl_img = cv::Mat(g_new_img, *pbarg->box);
+    roi_new = cv::Rect(match_loc_new.x, match_loc_new.y, new_tpl_img.cols, new_tpl_img.rows);
+    roi     = cv::Rect(match_loc.x,     match_loc.y,     old_tpl_img.cols, old_tpl_img.rows);
 
-    // Region of interest
+    avg_mssim_new = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi_new));
+    avg_mssim     = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi));
 
-    auto roi = cv::Rect(match_loc.x, match_loc.y, new_tpl_img.cols, new_tpl_img.rows);
+#if 0
+    debug_log("avg_mssim: %f avg_mssim_new: %f roi: %dx%d @ %d;%d\n",
+        avg_mssim, avg_mssim_new, roi.width, roi.height, roi.x, roi.y);
+#endif
 
-    if (g_strict >= 2) {
-      auto mssim = get_MSSIM(new_tpl_img, (*pbarg->out_img)(roi));
-      debug_log("mssim: %f %f %f\n", mssim.val[0], mssim.val[1], mssim.val[2]);
-      auto avg_mssim = (mssim.val[0] + mssim.val[1] + mssim.val[2]) / 3;
-      if (avg_mssim < MIN_MSSIM) {
-        // Images are considered significantly different
-        throw LowMssimException(avg_mssim, roi, *pbarg->filename);
-      }
+    if (avg_mssim_new < avg_mssim) {
+      patch(*pbarg->out_img, new_tpl_img, roi);
+    } else {
+      patch(*pbarg->out_img, new_tpl_img, roi_new);
     }
-
-    // Copy NEW_TPL_IMG over the mask of the target matrix OLD_IMG
-    // at location (match_loc.x, match_loc.y).
-    // The result will be stored in OUT_IMG.
-
-    patch(*pbarg->out_img, new_tpl_img, roi);
   } catch (ErrorException& e) {
     success = false;
     log::push_error(e.what());
@@ -282,7 +293,6 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
     for (int i = 0; i < n_boxes; i++) {
       IT_LOCK(g_work_mutex);
-      debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
 
       if (!_is_huge_bound_box(boxes[i], out_img)) {
         pbarg[i].box = &boxes[i];
@@ -302,7 +312,9 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
     for (int i = 0; i < n_boxes; i++) {
       if (pbarg[i].thread_id) {
+#if 0
         debug_log("joining thread #%ld\n", pbarg[i].thread_id);
+#endif
         pthread_join(pbarg[i].thread_id, &thread_result);
         if (!thread_result) {
           success = false;
@@ -431,7 +443,9 @@ run()
   // Wait for threads to finish
 
   for (int i = 0; i < n_images; i++) {
+#if 0
     debug_log("(images) joining thread #%ld\n", img_proc_args[i].thread_id);
+#endif
     pthread_join(img_proc_args[i].thread_id, &thread_result);
     if (!thread_result) {
       success = false;

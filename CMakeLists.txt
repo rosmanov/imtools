@@ -7,6 +7,8 @@ option(IMTOOLS_DEBUG "Enable debugging support in ImTools" OFF)
 option(IMTOOLS_THREADS "Enable threading" ON)
 # -D IMTOOLS_EXTRA:STRING=OFF
 option(IMTOOLS_EXTRA "Enable extra tools" OFF)
+# -D IMTOOLS_DEBUG_PROFILER:STRING=OFF
+option(IMTOOLS_DEBUG_PROFILER "Enable profiling info in debug messages" OFF)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
@@ -18,6 +20,9 @@ find_package(LibOpenCV REQUIRED)
 
 if (IMTOOLS_DEBUG)
   set (CMAKE_BUILD_TYPE "Debug")
+  if (IMTOOLS_DEBUG_PROFILE)
+    add_definitions(-DIMTOOLS_DEBUG_PROFILER)
+  endif (IMTOOLS_DEBUG_PROFILE)
 else (IMTOOLS_DEBUG)
   set (CMAKE_BUILD_TYPE "Release")
 endif (IMTOOLS_DEBUG)

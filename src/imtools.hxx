@@ -66,6 +66,10 @@ using cv::Point;
 
 namespace imtools {
 
+/// Minimum area of a bounding box to be considered "big enough" in square pixels
+/// Bounding boxes having smaller area will be merged together by means of morphological operations.
+const int MIN_BOUND_BOX_AREA = 2800;
+
 /// Verbose mode for CLI output
 /// 0 - off, 1 - verbose, 2 - more verbose
 extern int verbose;
@@ -83,8 +87,8 @@ enum blur_type {
 };
 
 enum {
-  THRESHOLD_MOD       = 0, //42,
-  THRESHOLD_MIN       = 0, //20,
+  THRESHOLD_MOD       = 40,
+  THRESHOLD_MIN       = 20,
   THRESHOLD_MAX       = 255,
   THRESHOLD_BOXES_MIN = 0, //3,
   THRESHOLD_BOXES_MAX = 255
@@ -142,6 +146,9 @@ void patch(Mat& out_mat, const Mat& tpl_mat, const Rect& roi);
 /// Find bounding boxes in mask (can be obtained with diff() + threshold())
 void bound_boxes(bound_box_vector_t& boxes, const Mat& mask,
     int min_threshold = THRESHOLD_BOXES_MIN, int max_threshold = THRESHOLD_BOXES_MAX);
+
+// Get average of the value computed by get_MSSIM()
+double get_avg_MSSIM(const Mat& i1, const Mat& i2);
 
 /// Computes structural similarity coefficient, i.e. similarity between i1 and i2 matrices.
 /// Each item of the return value is a number between 0 and 1, where 1 is the perfect match.
