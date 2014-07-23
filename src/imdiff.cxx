@@ -8,7 +8,7 @@ static std::string g_out_filename;
 
 // Minimum difference between old and new matrix elements specifying
 // whether element is considered to be modified.
-static int g_modification_threshold = 42;
+static int g_modification_threshold = 40;
 static const int g_max_modification_threshold = 200;
 
 static int g_thresh = 20;

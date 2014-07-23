@@ -57,7 +57,7 @@ namespace log
     }                                    \
   } while(0)
 
-#ifdef IMTOOLS_DEBUG
+#ifdef IMTOOLS_DEBUG_PROFILER
 # define timespec_to_float(__t) ((double)((__t).tv_sec + (__t).tv_nsec * 1e-9))
 # define debug_timer_init(__t1, __t2) struct timespec __t1, __t2
 # define debug_timer_start(__t) clock_gettime(CLOCK_REALTIME, &(__t))

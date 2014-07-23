@@ -45,7 +45,7 @@ init()
 
   // Initialize threading
 
-  IT_ATTR_INIT(g_pta);
+  IT_ATTR_INIT(g_thread_attr);
   IT_MUTEX_CREATE(g_work_mutex);
   IT_MUTEX_CREATE(g_process_images_mutex);
 }
@@ -60,7 +60,7 @@ cleanup()
 
   IT_MUTEX_DESTROY(g_process_images_mutex);
   IT_MUTEX_DESTROY(g_work_mutex);
-  IT_ATTR_DESTROY(g_pta);
+  IT_ATTR_DESTROY(g_thread_attr);
 }
 
 
@@ -74,8 +74,6 @@ usage(bool is_error)
       THRESHOLD_MOD,
       THRESHOLD_MIN,
       THRESHOLD_MAX,
-      THRESHOLD_BOXES_MIN,
-      THRESHOLD_BOXES_MAX,
       g_program_name);
 }
 
@@ -148,8 +146,8 @@ load_images(const int argc, char** argv)
     exit(1);
   }
 
-  // Load the two images which will specify the modificatoin to be applied to each of g_dst_images;
-  // force 3 channels
+  // Load the two images which will specify the modificatoin to be applied to
+  // each of g_dst_images; force 3 channels
 
   g_old_img = cv::imread(g_old_image_filename, 1);
   g_new_img = cv::imread(g_new_image_filename, 1);
@@ -163,54 +161,97 @@ load_images(const int argc, char** argv)
 }
 
 
-/// Thread routine a patch indicated by bounding box to the output matrix.
+/// Thread routine applying a patch indicated by bounding box to the output matrix.
 /// @note Is called directly, if there is no threads support.
-
 static void*
 apply_bounding_box(void* arg)
 {
-  bool       success = true;
-  box_arg_t *pbarg;
-  cv::Mat    old_tpl_img;
-  cv::Mat    new_tpl_img;
-  cv::Point  match_loc;
+  bool         success       = true;
+  box_arg_t   *pbarg;
+  Mat          old_tpl_img;
+  Mat          new_tpl_img;
+  Point        match_loc, match_loc_new;
+  Rect         roi, roi_new;
+  bound_box_t *box;
+  double       avg_mssim;
+  double       avg_mssim_new;
 
   pbarg = (box_arg_t *) arg;
   assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
+  box = pbarg->box;
+  Rect homo_box(*box);
+
+  debug_log("apply_bounding_box: %dx%d @ %d;%d\n",
+      box->width, box->height, box->x, box->y);
 
   try {
-    // Get a part of original image which had been changed
-    // using the next bounding box as a mask
+    // The more the box area is heterogeneouson g_old_img, the more chances
+    // to match this location on the image being patched.
+    // However, make_heterogeneous() *modifies* the box! So we'll have to restore its size
+    // before patching.
+    make_heterogeneous(/**box*/homo_box, g_old_img);
 
-    old_tpl_img = cv::Mat(g_old_img, *pbarg->box);
+    old_tpl_img = Mat(g_old_img, homo_box);
+    new_tpl_img = Mat(g_new_img, *box);
 
-    // Find location on OLD_IMG which is similar to OLD_TPL_IMG
-
+    // Find likely location of an area similar to old_tpl_img on the image being processed now
     match_template(match_loc, *pbarg->old_img, old_tpl_img);
+    // Some patches may already be applied. We'll try to detect if it's so.
+    match_template(match_loc_new, *pbarg->old_img, new_tpl_img);
 
-    // Now get modified part corresponding to current box
+    if (homo_box != *box) {
+      assert(box->x >= homo_box.x && box->y >= homo_box.y);
 
-    new_tpl_img = cv::Mat(g_new_img, *pbarg->box);
+      roi = cv::Rect(match_loc.x + (box->x - homo_box.x),
+          match_loc.y + (box->y - homo_box.y),
+          box->width, box->height);
 
-    // Region of interest
+    } else {
+      roi = cv::Rect(match_loc.x, match_loc.y, old_tpl_img.cols, old_tpl_img.rows);
+    }
+    roi_new = cv::Rect(match_loc_new.x, match_loc_new.y, new_tpl_img.cols, new_tpl_img.rows);
 
-    auto roi = cv::Rect(match_loc.x, match_loc.y, new_tpl_img.cols, new_tpl_img.rows);
+    // Calculate average similarity
 
-    if (g_strict >= 2) {
-      auto mssim = get_MSSIM(new_tpl_img, (*pbarg->out_img)(roi));
-      debug_log("mssim: %f %f %f\n", mssim.val[0], mssim.val[1], mssim.val[2]);
-      auto avg_mssim = (mssim.val[0] + mssim.val[1] + mssim.val[2]) / 3;
-      if (avg_mssim < MIN_MSSIM) {
-        // Images are considered significantly different
-        throw LowMssimException(avg_mssim, roi, *pbarg->filename);
-      }
+    avg_mssim     = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi));
+    avg_mssim_new = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi_new));
+
+    if (avg_mssim_new < avg_mssim) {
+      patch(*pbarg->out_img, new_tpl_img, roi);
+    } else {
+      patch(*pbarg->out_img, new_tpl_img, roi_new);
     }
 
-    // Copy NEW_TPL_IMG over the mask of the target matrix OLD_IMG
-    // at location (match_loc.x, match_loc.y).
-    // The result will be stored in OUT_IMG.
+#if 0
+    double       avg_mssim;
+    double       avg_mssim_new;
+    Point match_loc_new;
+    Rect roi_new;
 
-    patch(*pbarg->out_img, new_tpl_img, roi);
+    // Modified and original parts corresponding to the current bounding box
+
+    new_tpl_img = Mat(g_new_img, *box);
+    old_tpl_img = Mat(g_old_img, *box);
+
+    // Find likely locations of the modified/original parts on the currently processed image
+
+    match_template(match_loc_new, *pbarg->old_img, new_tpl_img);
+    match_template(match_loc,     *pbarg->old_img, old_tpl_img);
+
+    // Get rectangles of the bounding boxes
+
+    roi_new = cv::Rect(match_loc_new.x, match_loc_new.y, new_tpl_img.cols, new_tpl_img.rows);
+    roi     = cv::Rect(match_loc.x,     match_loc.y,     old_tpl_img.cols, old_tpl_img.rows);
+
+    avg_mssim_new = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi_new));
+    avg_mssim     = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi));
+
+    if (avg_mssim_new < avg_mssim) {
+      patch(*pbarg->out_img, new_tpl_img, roi);
+    } else {
+      patch(*pbarg->out_img, new_tpl_img, roi_new);
+    }
+#endif
   } catch (ErrorException& e) {
     success = false;
     log::push_error(e.what());
@@ -223,8 +264,9 @@ apply_bounding_box(void* arg)
 }
 
 /// Checks if box is suspiciously large (sometimes opencv can produce bounding boxes
-/// embracing smaller boxes, or even entire image!). Looks like OpenCV bug. It shouldn't
-/// return nested boxes!
+/// embracing smaller boxes, or even entire image!). Looks like OpenCV bug. It
+/// shouldn't return nested rectangles!
+
 static inline bool
 _is_huge_bound_box(const bound_box_t& box, const Mat& out_img)
 {
@@ -239,6 +281,7 @@ _is_huge_bound_box(const bound_box_t& box, const Mat& out_img)
 
 
 /// Applies all patches to the target image
+///
 /// FILENAME - target filename.
 /// DIFF_IMG - binary image with information about differences between
 /// original and modified images, where modified spots have high values.
@@ -249,8 +292,10 @@ static bool
 process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 {
   bool success = true;
-  cv::Mat old_img, out_img, old_tpl_img, new_tpl_img;
+  int n_boxes;
+  Mat old_img, out_img, old_tpl_img, new_tpl_img;
   string merged_filename;
+  bound_box_vector_t boxes;
 
   verbose_log2("Processing target: %s\n", filename.c_str());
 
@@ -265,13 +310,10 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
   out_img = old_img.clone();
 
-  // Generate rectangles bounding each cluster of changed pixels within DIFF_IMG.
+  // Generate rectangles bounding clusters of white (changed) pixels on DIFF_IMG
 
-  bound_box_vector_t boxes;
-  bound_boxes(boxes, diff_img);
-
-  int n_boxes = boxes.size();
-  debug_log("boxes.size() = %d\n", n_boxes);
+  bound_boxes(boxes, diff_img, g_min_threshold, g_max_threshold);
+  n_boxes = boxes.size();
 
   // Apply the bounding boxes
 
@@ -282,7 +324,6 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
     for (int i = 0; i < n_boxes; i++) {
       IT_LOCK(g_work_mutex);
-      debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
 
       if (!_is_huge_bound_box(boxes[i], out_img)) {
         pbarg[i].box = &boxes[i];
@@ -290,7 +331,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
         pbarg[i].out_img = &out_img;
         pbarg[i].filename = &filename;
 
-        pthread_create(&pbarg[i].thread_id, &g_pta, apply_bounding_box, &pbarg[i]);
+        pthread_create(&pbarg[i].thread_id, &g_thread_attr, apply_bounding_box, &pbarg[i]);
       } else {
         pbarg[i].thread_id = 0;
       }
@@ -302,7 +343,6 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
     for (int i = 0; i < n_boxes; i++) {
       if (pbarg[i].thread_id) {
-        debug_log("joining thread #%ld\n", pbarg[i].thread_id);
         pthread_join(pbarg[i].thread_id, &thread_result);
         if (!thread_result) {
           success = false;
@@ -340,7 +380,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
     return success;
   }
 
-  // Save merged matrix to filesystem
+  // Save merged matrix on filesystem
 
   merged_filename = out_filename
     ? out_filename->c_str()
@@ -364,6 +404,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
 #ifdef IMTOOLS_THREADS
 /// Thread routine calling PROCESS_IMAGE function
+/// Returns non-NULL on success, otherwise NULL.
 
 static void*
 process_image_thread_func(void* arg)
@@ -378,7 +419,7 @@ process_image_thread_func(void* arg)
     return NULL;
   }
 
-  return (void*)1;
+  return ((void*)1);
 }
 #endif
 
@@ -388,22 +429,24 @@ run()
 {
   bool success = true;
 
-  debug_timer_init(t1, t2);
-  debug_timer_start(t1);
-
-  cv::Point match_loc;
-  cv::Mat out_img, diff_img, old_tpl_img, new_tpl_img;
+  Point match_loc;
+  Mat out_img, diff_img, old_tpl_img, new_tpl_img;
+  int i = 0;
 
   // Compute difference between g_old_img and g_new_img
 
+  debug_timer_init(t1, t2);
+  debug_timer_start(t1);
   diff(diff_img, g_old_img, g_new_img, g_mod_threshold);
   debug_timer_end(t1, t2, diff);
 
+#if 0 // We already suppress noise in bound_boxes()
   // Suppress noise
 
   debug_timer_start(t1);
   threshold(diff_img, g_min_threshold, g_max_threshold);
   debug_timer_end(t1, t2, threshold);
+#endif
 
 
   // Patch the target images
@@ -412,16 +455,21 @@ run()
   int n_images = g_dst_images.size();
   auto img_proc_args = new image_process_arg_t[n_images];
   void* thread_result;
-  int i = 0;
 
-  for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it, ++i) {
+  assert(g_out_images.size() == g_dst_images.size());
+
+  for (images_vector_t::iterator it = g_dst_images.begin();
+      it != g_dst_images.end();
+      ++it, ++i)
+  {
     IT_LOCK(g_process_images_mutex);
 
     img_proc_args[i].diff_img = &diff_img;
     img_proc_args[i].filename = &*it;
     img_proc_args[i].out_filename = g_pairs ? &g_out_images[i] : NULL;
 
-    pthread_create(&img_proc_args[i].thread_id, &g_pta, process_image_thread_func, (void*)&img_proc_args[i]);
+    pthread_create(&img_proc_args[i].thread_id, &g_thread_attr,
+        process_image_thread_func, (void*)&img_proc_args[i]);
 
     IT_UNLOCK(g_process_images_mutex);
   }
@@ -430,8 +478,7 @@ run()
 
   // Wait for threads to finish
 
-  for (int i = 0; i < n_images; i++) {
-    debug_log("(images) joining thread #%ld\n", img_proc_args[i].thread_id);
+  for (i = 0; i < n_images; i++) {
     pthread_join(img_proc_args[i].thread_id, &thread_result);
     if (!thread_result) {
       success = false;
@@ -440,8 +487,10 @@ run()
 
   delete [] img_proc_args;
 #else // no threads
-  int i = 0;
-  for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it, ++i) {
+  for (images_vector_t::iterator it = g_dst_images.begin();
+      it != g_dst_images.end();
+      ++it, ++i)
+  {
     try {
       if (!process_image(*it, diff_img, (g_pairs ? &g_out_images[i] : NULL)))
         success = false;
@@ -516,14 +565,6 @@ int main(int argc, char **argv)
           save_int_opt_arg(g_max_threshold, "Invalid max threshold\n");
           break;
 
-        case 'b':
-          save_int_opt_arg(g_min_boxes_threshold, "Invalid min bound boxes threshold");
-          break;
-
-        case 'B':
-          save_int_opt_arg(g_max_boxes_threshold, "Invalid max bound boxes threshold");
-          break;
-
         case 'v':
           verbose++;
           break;
@@ -561,8 +602,6 @@ int main(int argc, char **argv)
   debug_log("mod-threshold: %d\n", g_mod_threshold);
   debug_log("min-threshold: %d\n", g_min_threshold);
   debug_log("max-threshold: %d\n", g_max_threshold);
-  debug_log("min-boxes-threshold: %d\n", g_min_boxes_threshold);
-  debug_log("max-boxes-threshold: %d\n", g_max_boxes_threshold);
 
   init();
 
