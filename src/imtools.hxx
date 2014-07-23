@@ -41,7 +41,7 @@ using cv::Scalar;
 using cv::Point;
 
 
-#define IMTOOLS_VERSION "1.0.3-r2"
+#define IMTOOLS_VERSION "1.0.4-r0"
 
 #ifdef IMTOOLS_DEBUG
 # define IMTOOLS_BUILD_TYPE "debug"
@@ -87,11 +87,9 @@ enum blur_type {
 };
 
 enum {
-  THRESHOLD_MOD       = 40,
-  THRESHOLD_MIN       = 20,
-  THRESHOLD_MAX       = 255,
-  THRESHOLD_BOXES_MIN = 0, //3,
-  THRESHOLD_BOXES_MAX = 255
+  THRESHOLD_MOD = 40,
+  THRESHOLD_MIN = 20,
+  THRESHOLD_MAX = 255
 };
 
 struct box_arg_t {
@@ -126,8 +124,9 @@ file_exists(const std::string& filename)
 
 int get_int_opt_arg(const char* optarg, const char* format, ...);
 
-// Computes difference between old_img and new_img. The matrix values lower than mod_threshold are
-// cut down to zeros. Result (1-channel binary image) is stored in out_img.
+/// Computes difference between old_img and new_img. The matrix values lower
+/// than mod_threshold are cut down to zeros. Result (1-channel binary image) is
+/// stored in out_img.
 void diff(Mat& out_img, const Mat& old_img, const Mat& new_img,
     const int mod_threshold = THRESHOLD_MOD);
 
@@ -145,7 +144,7 @@ void patch(Mat& out_mat, const Mat& tpl_mat, const Rect& roi);
 
 /// Find bounding boxes in mask (can be obtained with diff() + threshold())
 void bound_boxes(bound_box_vector_t& boxes, const Mat& mask,
-    int min_threshold = THRESHOLD_BOXES_MIN, int max_threshold = THRESHOLD_BOXES_MAX);
+    int min_threshold = THRESHOLD_MIN, int max_threshold = THRESHOLD_MAX);
 
 // Get average of the value computed by get_MSSIM()
 double get_avg_MSSIM(const Mat& i1, const Mat& i2);
@@ -153,6 +152,10 @@ double get_avg_MSSIM(const Mat& i1, const Mat& i2);
 /// Computes structural similarity coefficient, i.e. similarity between i1 and i2 matrices.
 /// Each item of the return value is a number between 0 and 1, where 1 is the perfect match.
 Scalar get_MSSIM(const Mat& i1, const Mat& i2);
+
+/// Detect whether SRC is homogenuous within boundaries of RECT.
+/// Enlarge RECT until it is heterogeneous, or SRC boundaries are reached.
+void make_heterogeneous(Rect& rect, const Mat& src);
 
 } // namespace imtools
 

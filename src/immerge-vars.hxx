@@ -26,8 +26,6 @@ const char* g_program_name;
 int g_mod_threshold       = THRESHOLD_MOD;
 int g_min_threshold       = THRESHOLD_MIN;
 int g_max_threshold       = THRESHOLD_MAX;
-int g_min_boxes_threshold = THRESHOLD_BOXES_MIN;
-int g_max_boxes_threshold = THRESHOLD_BOXES_MAX;
 
 string g_old_image_filename;
 string g_new_image_filename;
@@ -47,7 +45,7 @@ cv::Mat g_new_img;
 #ifdef IMTOOLS_THREADS
 pthread_mutex_t g_work_mutex;
 pthread_mutex_t g_process_images_mutex;
-pthread_attr_t g_pta;
+pthread_attr_t g_thread_attr;
 #endif // if threads
 
 // Destination images
@@ -80,8 +78,6 @@ const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 " -m, --mod-threshold        Modification threshold. Default: %d\n"
 " -L, --min-threshold        Min. noise suppression threshold. Default: %d\n"
 " -H, --max-threshold        Max. noise suppression threshold. Default: %d\n"
-" -b, --boxes-min-threshold  Min. threshold for bound boxes. Default: %d\n"
-" -B, --boxes-max-threshold  Max. threshold for bound boxes. Default: %d\n\n"
 "EXAMPLE:\n"
 "%s -o old.png -n new.png -p old1.png out1.png old2.png out2.png\n";
 
