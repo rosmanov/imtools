@@ -170,9 +170,11 @@ apply_bounding_box(void* arg)
   box_arg_t   *pbarg;
   Mat          old_tpl_img;
   Mat          new_tpl_img;
-  Point        match_loc;
-  Rect         roi;
+  Point        match_loc, match_loc_new;
+  Rect         roi, roi_new;
   bound_box_t *box;
+  double       avg_mssim;
+  double       avg_mssim_new;
 
   pbarg = (box_arg_t *) arg;
   assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
@@ -194,6 +196,8 @@ apply_bounding_box(void* arg)
 
     // Find likely location of an area similar to old_tpl_img on the image being processed now
     match_template(match_loc, *pbarg->old_img, old_tpl_img);
+    // Some patches may already be applied. We'll try to detect if it's so.
+    match_template(match_loc_new, *pbarg->old_img, new_tpl_img);
 
     if (homo_box != *box) {
       assert(box->x >= homo_box.x && box->y >= homo_box.y);
@@ -205,8 +209,18 @@ apply_bounding_box(void* arg)
     } else {
       roi = cv::Rect(match_loc.x, match_loc.y, old_tpl_img.cols, old_tpl_img.rows);
     }
+    roi_new = cv::Rect(match_loc_new.x, match_loc_new.y, new_tpl_img.cols, new_tpl_img.rows);
 
-    patch(*pbarg->out_img, new_tpl_img, roi);
+    // Calculate average similarity
+
+    avg_mssim     = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi));
+    avg_mssim_new = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi_new));
+
+    if (avg_mssim_new < avg_mssim) {
+      patch(*pbarg->out_img, new_tpl_img, roi);
+    } else {
+      patch(*pbarg->out_img, new_tpl_img, roi_new);
+    }
 
 #if 0
     double       avg_mssim;
