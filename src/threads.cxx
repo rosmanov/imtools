@@ -14,28 +14,22 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
-#ifndef IMTOOLS_THREADS_HXX
-#define IMTOOLS_THREADS_HXX
-
+#include "threads.hxx"
 
 #ifdef IMTOOLS_THREADS
-#include <boost/thread/mutex.hpp>
-#include <boost/bind.hpp>
-#include <boost/threadpool.hpp>
-#define IT_IO_SCOPED_LOCK(l) boost::mutex::scoped_lock l(imtools::threads::io_mutex)
-
 namespace imtools { namespace threads
 {
 
-/// Mutex for I/O operations
-extern boost::mutex io_mutex;
+boost::mutex io_mutex;
 
-boost::thread::id get_id();
+boost::thread::id
+get_id()
+{
+  return boost::this_thread::get_id();
+}
 
 }} // namespace imtools::threads
 
-#else
-#define IT_IO_SCOPED_LOCK(l)
 #endif // IMTOOLS_THREADS
-#endif // IMTOOLS_THREADS_HXX
+
 // vim: et ts=2 sts=2 sw=2

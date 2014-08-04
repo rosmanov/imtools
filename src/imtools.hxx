@@ -41,7 +41,7 @@ using cv::Scalar;
 using cv::Point;
 
 
-#define IMTOOLS_VERSION "1.0.4-r0"
+#define IMTOOLS_VERSION "1.1.0-dev"
 
 #ifdef IMTOOLS_DEBUG
 # define IMTOOLS_BUILD_TYPE "debug"
@@ -74,6 +74,7 @@ const int MIN_BOUND_BOX_AREA = 2800;
 /// 0 - off, 1 - verbose, 2 - more verbose
 extern int verbose;
 
+
 typedef unsigned int uint_t;
 typedef Rect bound_box_t;
 typedef std::vector<bound_box_t> bound_box_vector_t;
@@ -93,7 +94,6 @@ enum {
 };
 
 struct box_arg_t {
-  pthread_t   thread_id;
   bound_box_t *box;
   Mat         *old_img;
   Mat         *out_img;
@@ -101,10 +101,9 @@ struct box_arg_t {
 };
 
 struct image_process_arg_t {
-  pthread_t    thread_id;
   std::string *filename;
   std::string *out_filename;
-  Mat     *diff_img;
+  Mat         *diff_img;
 };
 
 inline bool

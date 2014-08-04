@@ -21,9 +21,17 @@
  */
 
 #include "immerge.hxx"
+#include <thread> // std::thread::hardware_concurrency()
 
 using namespace imtools;
 using std::string;
+
+
+static inline unsigned
+max_threads()
+{
+  return std::thread::hardware_concurrency();
+}
 
 
 static void
@@ -42,25 +50,6 @@ init()
   g_compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
   g_compression_params.push_back(90);
 #endif
-
-  // Initialize threading
-
-  IT_ATTR_INIT(g_thread_attr);
-  IT_MUTEX_CREATE(g_work_mutex);
-  IT_MUTEX_CREATE(g_process_images_mutex);
-}
-
-
-static void
-cleanup()
-{
-  debug_log0("cleanup()\n");
-
-  // Release resources allocated for threading
-
-  IT_MUTEX_DESTROY(g_process_images_mutex);
-  IT_MUTEX_DESTROY(g_work_mutex);
-  IT_ATTR_DESTROY(g_thread_attr);
 }
 
 
@@ -74,17 +63,15 @@ usage(bool is_error)
       THRESHOLD_MOD,
       THRESHOLD_MIN,
       THRESHOLD_MAX,
+      max_threads(),
       g_program_name);
 }
 
 
 /// Loads images specified by the CLI arguments into memory
-
 static void
 load_images(const int argc, char** argv)
 {
-  // Load target images
-
   if (optind < argc) {
     if (g_pairs) {
       // ARGV is a list of input and output files: infile outfile infile2 outfile2 ...
@@ -136,13 +123,13 @@ load_images(const int argc, char** argv)
   } else {
     strict_log(g_strict, "Target image(s) expected. "
         "You don't need this tool just to replace one image with another ;)\n");
-    usage(true);
+    //usage(true);
     exit(1);
   }
 
   if (g_old_image_filename.length() == 0 || g_new_image_filename.length() == 0) {
     strict_log(g_strict, "expected non-empty image paths for comparison.\n");
-    usage(true);
+    //usage(true);
     exit(1);
   }
 
@@ -163,11 +150,10 @@ load_images(const int argc, char** argv)
 
 /// Thread routine applying a patch indicated by bounding box to the output matrix.
 /// @note Is called directly, if there is no threads support.
-static void*
-apply_bounding_box(void* arg)
+static bool
+apply_bounding_box(box_arg_t* pbarg)
 {
   bool         success       = true;
-  box_arg_t   *pbarg;
   Mat          old_tpl_img;
   Mat          new_tpl_img;
   Point        match_loc, match_loc_new;
@@ -176,7 +162,6 @@ apply_bounding_box(void* arg)
   double       avg_mssim;
   double       avg_mssim_new;
 
-  pbarg = (box_arg_t *) arg;
   assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
   box = pbarg->box;
   Rect homo_box(*box);
@@ -221,37 +206,6 @@ apply_bounding_box(void* arg)
     } else {
       patch(*pbarg->out_img, new_tpl_img, roi_new);
     }
-
-#if 0
-    double       avg_mssim;
-    double       avg_mssim_new;
-    Point match_loc_new;
-    Rect roi_new;
-
-    // Modified and original parts corresponding to the current bounding box
-
-    new_tpl_img = Mat(g_new_img, *box);
-    old_tpl_img = Mat(g_old_img, *box);
-
-    // Find likely locations of the modified/original parts on the currently processed image
-
-    match_template(match_loc_new, *pbarg->old_img, new_tpl_img);
-    match_template(match_loc,     *pbarg->old_img, old_tpl_img);
-
-    // Get rectangles of the bounding boxes
-
-    roi_new = cv::Rect(match_loc_new.x, match_loc_new.y, new_tpl_img.cols, new_tpl_img.rows);
-    roi     = cv::Rect(match_loc.x,     match_loc.y,     old_tpl_img.cols, old_tpl_img.rows);
-
-    avg_mssim_new = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi_new));
-    avg_mssim     = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi));
-
-    if (avg_mssim_new < avg_mssim) {
-      patch(*pbarg->out_img, new_tpl_img, roi);
-    } else {
-      patch(*pbarg->out_img, new_tpl_img, roi_new);
-    }
-#endif
   } catch (ErrorException& e) {
     success = false;
     log::push_error(e.what());
@@ -260,13 +214,13 @@ apply_bounding_box(void* arg)
     log::push_error("Caught unknown exception!\n");
   }
 
-  return (void*)(success);
+  return success;
 }
+
 
 /// Checks if box is suspiciously large (sometimes opencv can produce bounding boxes
 /// embracing smaller boxes, or even entire image!). Looks like OpenCV bug. It
 /// shouldn't return nested rectangles!
-
 static inline bool
 _is_huge_bound_box(const bound_box_t& box, const Mat& out_img)
 {
@@ -287,7 +241,6 @@ _is_huge_bound_box(const bound_box_t& box, const Mat& out_img)
 /// original and modified images, where modified spots have high values.
 /// OUT_FILENAME - optional output filename. If is NULL, result is
 /// written to the output directory.
-
 static bool
 process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 {
@@ -317,43 +270,6 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
   // Apply the bounding boxes
 
-#if defined(IMTOOLS_THREADS)
-  if (n_boxes) {
-    void* thread_result;
-    auto pbarg = new box_arg_t[n_boxes];
-
-    for (int i = 0; i < n_boxes; i++) {
-      IT_LOCK(g_work_mutex);
-
-      if (!_is_huge_bound_box(boxes[i], out_img)) {
-        pbarg[i].box = &boxes[i];
-        pbarg[i].old_img = &old_img;
-        pbarg[i].out_img = &out_img;
-        pbarg[i].filename = &filename;
-
-        pthread_create(&pbarg[i].thread_id, &g_thread_attr, apply_bounding_box, &pbarg[i]);
-      } else {
-        pbarg[i].thread_id = 0;
-      }
-
-      IT_UNLOCK(g_work_mutex);
-    }
-
-    // Wait until threads are finished
-
-    for (int i = 0; i < n_boxes; i++) {
-      if (pbarg[i].thread_id) {
-        pthread_join(pbarg[i].thread_id, &thread_result);
-        if (!thread_result) {
-          success = false;
-          // No break. We have to wait for the rest of threads.
-        }
-      }
-    }
-
-    delete [] pbarg;
-  }
-#else // no threads
   for (int i = 0; i < n_boxes; i++) {
     debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
 
@@ -372,7 +288,6 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
       break;
     }
   }
-#endif // IMTOOLS_THREADS
 
   if (!success) {
     log::warn_all();
@@ -403,23 +318,18 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
 
 #ifdef IMTOOLS_THREADS
-/// Thread routine calling PROCESS_IMAGE function
-/// Returns non-NULL on success, otherwise NULL.
-
-static void*
-process_image_thread_func(void* arg)
+static void
+process_image_thread_func(image_process_arg_t* ipa)
 {
-  image_process_arg_t* ipa = (image_process_arg_t*)arg;
-
   try {
-    if (!process_image(*ipa->filename, *ipa->diff_img, ipa->out_filename))
-      return NULL;
+    if (process_image(*ipa->filename, *ipa->diff_img, ipa->out_filename))
+      return;
   } catch (ErrorException& e) {
     warning_log("%s\n", e.what());
-    return NULL;
   }
 
-  return ((void*)1);
+  boost::mutex::scoped_lock lock(g_thread_success_mutex);
+  g_thread_success = false;
 }
 #endif
 
@@ -433,6 +343,7 @@ run()
   Mat out_img, diff_img, old_tpl_img, new_tpl_img;
   int i = 0;
 
+
   // Compute difference between g_old_img and g_new_img
 
   debug_timer_init(t1, t2);
@@ -440,50 +351,34 @@ run()
   diff(diff_img, g_old_img, g_new_img, g_mod_threshold);
   debug_timer_end(t1, t2, diff);
 
-#if 0 // We already suppress noise in bound_boxes()
-  // Suppress noise
 
-  debug_timer_start(t1);
-  threshold(diff_img, g_min_threshold, g_max_threshold);
-  debug_timer_end(t1, t2, threshold);
-#endif
-
-
-  // Patch the target images
-
-#if defined(IMTOOLS_THREADS)
+#ifdef IMTOOLS_THREADS
   int n_images = g_dst_images.size();
   auto img_proc_args = new image_process_arg_t[n_images];
-  void* thread_result;
 
   assert(g_out_images.size() == g_dst_images.size());
 
+  pool thread_pool(g_max_threads);
+  boost::mutex process_images_mutex;
   for (images_vector_t::iterator it = g_dst_images.begin();
       it != g_dst_images.end();
       ++it, ++i)
   {
-    IT_LOCK(g_process_images_mutex);
+    boost::mutex::scoped_lock lock(process_images_mutex);
 
     img_proc_args[i].diff_img = &diff_img;
     img_proc_args[i].filename = &*it;
     img_proc_args[i].out_filename = g_pairs ? &g_out_images[i] : NULL;
 
-    pthread_create(&img_proc_args[i].thread_id, &g_thread_attr,
-        process_image_thread_func, (void*)&img_proc_args[i]);
-
-    IT_UNLOCK(g_process_images_mutex);
+    thread_pool.schedule(boost::bind(process_image_thread_func, &img_proc_args[i]));
   }
 
   assert(n_images == i);
 
   // Wait for threads to finish
 
-  for (i = 0; i < n_images; i++) {
-    pthread_join(img_proc_args[i].thread_id, &thread_result);
-    if (!thread_result) {
-      success = false;
-    }
-  }
+  thread_pool.wait();
+  success = g_thread_success;
 
   delete [] img_proc_args;
 #else // no threads
@@ -512,6 +407,10 @@ int main(int argc, char **argv)
   int next_option, exit_code = 0;
 
   g_program_name = argv[0];
+
+#ifdef IMTOOLS_THREADS
+  g_max_threads = max_threads();
+#endif
 
 #ifdef IMTOOLS_DEBUG
   setvbuf(stdout, NULL, _IONBF, 0); // turn off buffering
@@ -565,6 +464,21 @@ int main(int argc, char **argv)
           save_int_opt_arg(g_max_threshold, "Invalid max threshold\n");
           break;
 
+#ifdef IMTOOLS_THREADS
+        case 'T':
+          {
+            unsigned max_thread_num = max_threads();
+
+            save_int_opt_arg(g_max_threads, "Invalid max threads\n");
+
+            if (g_max_threads > max_thread_num) {
+              throw InvalidCliArgException("Cannot set max threads limit to %d. "
+                  "Maximum allowed value is %u", g_max_threads, max_thread_num);
+            }
+          }
+          break;
+#endif
+
         case 'v':
           verbose++;
           break;
@@ -594,19 +508,18 @@ int main(int argc, char **argv)
     } while (next_option != -1);
   } catch (imtools::InvalidCliArgException& e) {
     error_log("%s\n", e.what());
-    usage(true);
+    //usage(true);
     exit(2);
   }
 
-  debug_log("out-dir: %s\n", g_out_dir.c_str());
+  debug_log("out-dir: %s\n",       g_out_dir.c_str());
   debug_log("mod-threshold: %d\n", g_mod_threshold);
   debug_log("min-threshold: %d\n", g_min_threshold);
   debug_log("max-threshold: %d\n", g_max_threshold);
-
-  init();
+  debug_log("max-threads: %d\n",   g_max_threads);
 
   try {
-    // Load images into memory
+    init();
 
     debug_timer_init(t1, t2);
     debug_timer_start(t1);
@@ -626,8 +539,6 @@ int main(int argc, char **argv)
     error_log("Unknown error!!! Please file a bug.\n");
     exit_code = 1;
   }
-
-  cleanup();
 
   return exit_code;
 }

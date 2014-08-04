@@ -26,28 +26,24 @@ if (IMTOOLS_DEBUG)
 else (IMTOOLS_DEBUG)
   set (CMAKE_BUILD_TYPE "Release")
 endif (IMTOOLS_DEBUG)
-message (STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-set(THREADS_LIBRARIES)
 if (IMTOOLS_THREADS)
-  set(CMAKE_THREAD_PREFER_PTHREAD)
-  find_package(Threads)
-
-  if(NOT CMAKE_USE_PTHREADS_INIT)
-    message(FATAL_ERROR "pthreads not found")
-  endif(NOT CMAKE_USE_PTHREADS_INIT)
-
+  set(Boost_FOUND 0)
+  include(FindBoost)
+  find_package(Boost REQUIRED COMPONENTS system thread)
+  if (NOT Boost_FOUND)
+    message (FATAL_ERROR "Boost library with 'thread' component not found")
+  endif (NOT Boost_FOUND)
   add_definitions(-DIMTOOLS_THREADS)
-  set(THREADS_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
 endif (IMTOOLS_THREADS)
 
-set(CMAKE_REQUIRED_INCLUDES "${LIBOPENCV_INCLUDE_DIR}")
+set(CMAKE_REQUIRED_INCLUDES "${LIBOPENCV_INCLUDE_DIR} ${Boost_INCLUDE_DIRS}")
 set(CMAKE_REQUIRED_LIBRARIES "${LIBOPENCV_CORE_LIB} ${LIBOPENCV_IMGPROC_LIB}
-${LIBOPENCV_HIGHGUI_LIB}")
+${LIBOPENCV_HIGHGUI_LIB}
+")
+set(LIBS ${LIBS} ${LIBOPENCV_LIBS} ${Boost_LIBRARIES})
 
-set(LIBS ${LIBS} ${LIBOPENCV_LIBS} ${THREADS_LIBRARIES})
-
-set(common_src src/imtools.cxx src/exceptions.cxx src/log.cxx)
+set(common_src src/imtools.cxx src/exceptions.cxx src/log.cxx src/threads.cxx)
 
 set(imtools_targets immerge)
 if (IMTOOLS_EXTRA)

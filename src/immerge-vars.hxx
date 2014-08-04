@@ -6,6 +6,18 @@ using std::string;
 namespace imtools
 {
 
+#ifdef IMTOOLS_THREADS
+using namespace boost::threadpool;
+
+bool g_thread_success = true;
+unsigned g_max_threads = 4;
+
+boost::mutex g_process_images_mutex;
+boost::mutex g_thread_success_mutex;
+
+#endif
+
+
 /// Max. number of target images
 const int MAX_MERGE_TARGETS = 100;
 
@@ -23,9 +35,9 @@ const int MAX_BOUND_BOX_SIZE_REL = 70;
 
 const char* g_program_name;
 
-int g_mod_threshold       = THRESHOLD_MOD;
-int g_min_threshold       = THRESHOLD_MIN;
-int g_max_threshold       = THRESHOLD_MAX;
+int g_mod_threshold = THRESHOLD_MOD;
+int g_min_threshold = THRESHOLD_MIN;
+int g_max_threshold = THRESHOLD_MAX;
 
 string g_old_image_filename;
 string g_new_image_filename;
@@ -40,13 +52,6 @@ int g_strict = 0;
 // Matrices for old and new images
 cv::Mat g_old_img;
 cv::Mat g_new_img;
-
-
-#ifdef IMTOOLS_THREADS
-pthread_mutex_t g_work_mutex;
-pthread_mutex_t g_process_images_mutex;
-pthread_attr_t g_thread_attr;
-#endif // if threads
 
 // Destination images
 images_vector_t g_dst_images;
@@ -78,25 +83,33 @@ const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 " -m, --mod-threshold        Modification threshold. Default: %d\n"
 " -L, --min-threshold        Min. noise suppression threshold. Default: %d\n"
 " -H, --max-threshold        Max. noise suppression threshold. Default: %d\n"
+#ifdef IMTOOLS_THREADS
+" -T, --max-threads          Max. number of concurrent threads. Default: %d\n"
+#endif
 "EXAMPLE:\n"
 "%s -o old.png -n new.png -p old1.png out1.png old2.png out2.png\n";
 
-const char *g_short_options = "hvsn:o:d::pm::L::H::b::B::";
+const char *g_short_options = "hvsn:o:d::pm::L::H::"
+#ifdef IMTOOLS_THREADS
+  "T::"
+#endif
+  ;
 
 const struct option g_long_options[] = {
-  {"help",                no_argument,       NULL, 'h'},
-  {"verbose",             no_argument,       NULL, 'v'},
-  {"strict",              no_argument,       NULL, 's'},
-  {"new-image",           required_argument, NULL, 'n'},
-  {"old-image",           required_argument, NULL, 'o'},
-  {"out-dir",             optional_argument, NULL, 'd'},
-  {"pairs",               no_argument,       NULL, 'p'},
-  {"mod-threshold",       optional_argument, NULL, 'm'},
-  {"min-threshold",       optional_argument, NULL, 'L'},
-  {"max-threshold",       optional_argument, NULL, 'H'},
-  {"boxes-min-threshold", optional_argument, NULL, 'b'},
-  {"boxes-max-threshold", optional_argument, NULL, 'B'},
-  {0,                     0,                 0,    0}
+  {"help",          no_argument,       NULL, 'h'},
+  {"verbose",       no_argument,       NULL, 'v'},
+  {"strict",        no_argument,       NULL, 's'},
+  {"new-image",     required_argument, NULL, 'n'},
+  {"old-image",     required_argument, NULL, 'o'},
+  {"out-dir",       optional_argument, NULL, 'd'},
+  {"pairs",         no_argument,       NULL, 'p'},
+  {"mod-threshold", optional_argument, NULL, 'm'},
+  {"min-threshold", optional_argument, NULL, 'L'},
+  {"max-threshold", optional_argument, NULL, 'H'},
+#ifdef IMTOOLS_THREADS
+  {"max-threads",   optional_argument, NULL, 'T'},
+#endif
+  {0,               0,                 0,    0}
 };
 
 } // namespace imtools

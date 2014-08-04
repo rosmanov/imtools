@@ -22,31 +22,52 @@
 using std::vector;
 using std::string;
 
-namespace imtools
-{
-
-namespace log
+namespace imtools { namespace log
 {
 
 #ifdef IMTOOLS_DEBUG
-# define debug_log0(__str) printf("[Debug] [%lu] " __str, pthread_self())
-# define debug_log(__fmt, ...) printf("[Debug] [%lu] " __fmt, pthread_self(), __VA_ARGS__)
+# define debug_log0(__str)                                                \
+  do {                                                                    \
+    IT_IO_SCOPED_LOCK(io_lock);                                           \
+    std::cout << "[Debug] [" << imtools::threads::get_id() << "] " __str; \
+  } while (0)
+
+# define debug_log(__fmt, ...)                                      \
+  do {                                                              \
+    IT_IO_SCOPED_LOCK(io_lock);                                     \
+    std::cout << "[Debug] [" << imtools::threads::get_id() << "] "; \
+    printf(__fmt, __VA_ARGS__) ;                                    \
+  } while (0)
 #else
 # define debug_log0(__str)
 # define debug_log(__fmt, ...)
 #endif
 
-#define verbose_log(...)                       \
-  do {                                         \
-    if (imtools::verbose) printf(__VA_ARGS__); \
+#define verbose_log(...)          \
+  do {                            \
+    if (imtools::verbose) {       \
+      IT_IO_SCOPED_LOCK(io_lock); \
+      printf(__VA_ARGS__);        \
+    }                             \
   } while (0)
-#define verbose_log2(...)                               \
-  do {                                                  \
-    if (imtools::verbose > 1) printf("v2: " __VA_ARGS__); \
+#define verbose_log2(...)         \
+  do {                            \
+    if (imtools::verbose > 1) {   \
+      IT_IO_SCOPED_LOCK(io_lock); \
+      printf("v2: " __VA_ARGS__); \
+    }                             \
   } while (0)
 
-#define error_log(...) fprintf(stderr, "[Error] " __VA_ARGS__)
-#define warning_log(...) fprintf(stderr, "[Warning] " __VA_ARGS__)
+#define error_log(...)                       \
+  do {                                       \
+    IT_IO_SCOPED_LOCK(io_lock);              \
+    fprintf(stderr, "[Error] " __VA_ARGS__); \
+  } while (0)
+#define warning_log(...)                       \
+  do {                                         \
+    IT_IO_SCOPED_LOCK(io_lock);                \
+    fprintf(stderr, "[Warning] " __VA_ARGS__); \
+  } while (0)
 
 #define strict_log(is_strict, ...)       \
   do {                                   \
@@ -61,11 +82,12 @@ namespace log
 # define timespec_to_float(__t) ((double)((__t).tv_sec + (__t).tv_nsec * 1e-9))
 # define debug_timer_init(__t1, __t2) struct timespec __t1, __t2
 # define debug_timer_start(__t) clock_gettime(CLOCK_REALTIME, &(__t))
-# define debug_timer_end(__t1, __t2, __name)                                \
-  do {                                                                      \
-    clock_gettime(CLOCK_REALTIME, &(__t2));                                 \
-    printf("[%ld] Timer: " # __name  ": %f sec\n",                                  \
-        pthread_self(), timespec_to_float(__t2) - timespec_to_float(__t1)); \
+# define debug_timer_end(__t1, __t2, __name)                           \
+  do {                                                                 \
+    IT_IO_SCOPED_LOCK(io_lock);                                        \
+    clock_gettime(CLOCK_REALTIME, &(__t2));                            \
+    printf("[%s] Timer: " # __name ": "                                \
+        (timespec_to_float(__t2) - timespec_to_float(__t1)) " sec\n"); \
   } while(0)
 #else
 # define debug_timer_init(__t1, __t2)
@@ -85,10 +107,7 @@ inline void push_error(string& msg)
 }
 
 
-inline void push_error(const char* msg)
-{
-  error_stack.push_back(string(msg));
-}
+void push_error(const char* msg, ...);
 
 
 inline void warn_all()

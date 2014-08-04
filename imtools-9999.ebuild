@@ -19,6 +19,7 @@ IUSE="debug +threads extra"
 DEPEND="
 	media-libs/opencv
 	sys-libs/glibc
+	threads? ( dev-libs/boost[threads] dev-cpp/threadpool )
 "
 RDEPEND="${DEPEND}"
 
