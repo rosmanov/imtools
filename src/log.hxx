@@ -18,6 +18,7 @@
 #define IMTOOLS_LOG_HXX
 
 #include "imtools.hxx"
+#include <iostream>
 
 using std::vector;
 using std::string;
@@ -28,13 +29,13 @@ namespace imtools { namespace log
 #ifdef IMTOOLS_DEBUG
 # define debug_log0(__str)                                                \
   do {                                                                    \
-    IT_IO_SCOPED_LOCK(io_lock);                                           \
+    IT_IO_SCOPED_LOCK(__scoped_lock);                                     \
     std::cout << "[Debug] [" << imtools::threads::get_id() << "] " __str; \
   } while (0)
 
 # define debug_log(__fmt, ...)                                      \
   do {                                                              \
-    IT_IO_SCOPED_LOCK(io_lock);                                     \
+    IT_IO_SCOPED_LOCK(__scoped_lock);                               \
     std::cout << "[Debug] [" << imtools::threads::get_id() << "] "; \
     printf(__fmt, __VA_ARGS__) ;                                    \
   } while (0)
@@ -43,29 +44,30 @@ namespace imtools { namespace log
 # define debug_log(__fmt, ...)
 #endif
 
-#define verbose_log(...)          \
-  do {                            \
-    if (imtools::verbose) {       \
-      IT_IO_SCOPED_LOCK(io_lock); \
-      printf(__VA_ARGS__);        \
-    }                             \
+
+#define verbose_log(...)                \
+  do {                                  \
+    if (imtools::verbose) {             \
+      IT_IO_SCOPED_LOCK(__scoped_lock); \
+      printf(__VA_ARGS__);              \
+    }                                   \
   } while (0)
-#define verbose_log2(...)         \
-  do {                            \
-    if (imtools::verbose > 1) {   \
-      IT_IO_SCOPED_LOCK(io_lock); \
-      printf("v2: " __VA_ARGS__); \
-    }                             \
+#define verbose_log2(...)               \
+  do {                                  \
+    if (imtools::verbose > 1) {         \
+      IT_IO_SCOPED_LOCK(__scoped_lock); \
+      printf("v2: " __VA_ARGS__);       \
+    }                                   \
   } while (0)
 
-#define error_log(...)                       \
-  do {                                       \
-    IT_IO_SCOPED_LOCK(io_lock);              \
-    fprintf(stderr, "[Error] " __VA_ARGS__); \
+#define error_log(...)                         \
+  do {                                         \
+    IT_IO_SCOPED_LOCK(__scoped_lock);          \
+    fprintf(stderr, "[Error] " __VA_ARGS__);   \
   } while (0)
 #define warning_log(...)                       \
   do {                                         \
-    IT_IO_SCOPED_LOCK(io_lock);                \
+    IT_IO_SCOPED_LOCK(__scoped_lock);          \
     fprintf(stderr, "[Warning] " __VA_ARGS__); \
   } while (0)
 
@@ -84,7 +86,7 @@ namespace imtools { namespace log
 # define debug_timer_start(__t) clock_gettime(CLOCK_REALTIME, &(__t))
 # define debug_timer_end(__t1, __t2, __name)                           \
   do {                                                                 \
-    IT_IO_SCOPED_LOCK(io_lock);                                        \
+    IT_IO_SCOPED_LOCK(__scoped_lock);                                  \
     clock_gettime(CLOCK_REALTIME, &(__t2));                            \
     printf("[%s] Timer: " # __name ": "                                \
         (timespec_to_float(__t2) - timespec_to_float(__t1)) " sec\n"); \

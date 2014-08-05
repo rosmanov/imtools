@@ -14,25 +14,28 @@ DOCS="README.md LICENSE"
 LICENSE="GPL-2"
 SLOT="0"
 KEYWORDS="~amd64 ~x86"
-IUSE="debug +threads extra"
+IUSE="debug +threads +openmp extra"
 
 DEPEND="
 	media-libs/opencv
 	sys-libs/glibc
-	threads? ( dev-libs/boost[threads] dev-cpp/threadpool )
+	threads? ( !openmp? ( dev-libs/boost[threads] dev-cpp/threadpool ) )
 "
 RDEPEND="${DEPEND}"
 
 src_configure() {
+	use openmp && tc-has-openmp \
+		|| die "Your current compiler doesn't support OpenMP"
+
 	local mycmakeargs=(
 	  -DCMAKE_INSTALL_PREFIX=/usr
-	  $(cmake-utils_use_with debug)
-	  $(cmake-utils_use_with threads)
-	  $(cmake-utils_use_with extra)
+	  $(cmake-utils_use debug IMTOOLS_DEBUG)
+	  $(cmake-utils_use threads IMTOOLS_THREADS)
+	  $(cmake-utils_use openmp IMTOOLS_THREADS_OPENMP)
+	  $(cmake-utils_use extra IMTOOLS_EXTRA)
 	)
 
 	if use debug; then
-		mycmakeargs+=( "-DIMTOOLS_DEBUG=ON" )
 		CMAKE_BUILD_TYPE="Debug"
 	fi
 

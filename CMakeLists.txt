@@ -1,14 +1,21 @@
 cmake_minimum_required (VERSION 2.6)
 project (ImTools CXX C)
 
+include(CMakeDependentOption)
+
 # -D IMTOOLS_DEBUG:STRING=OFF
 option(IMTOOLS_DEBUG "Enable debugging support in ImTools" OFF)
 # -D IMTOOLS_THREADS:STRING=ON
 option(IMTOOLS_THREADS "Enable threading" ON)
+# -D IMTOOLS_THREADS_OPENMP:STRING=ON
+cmake_dependent_option(IMTOOLS_THREADS_OPENMP
+  "Use boost libraries for threading" ON
+  "IMTOOLS_THREADS" OFF)
 # -D IMTOOLS_EXTRA:STRING=OFF
 option(IMTOOLS_EXTRA "Enable extra tools" OFF)
 # -D IMTOOLS_DEBUG_PROFILER:STRING=OFF
-option(IMTOOLS_DEBUG_PROFILER "Enable profiling info in debug messages" OFF)
+cmake_dependent_option(IMTOOLS_DEBUG_PROFILER "Enable profiling info in debug messages" OFF
+  "IMTOOLS_DEBUG" OFF)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
@@ -28,22 +35,58 @@ else (IMTOOLS_DEBUG)
 endif (IMTOOLS_DEBUG)
 
 if (IMTOOLS_THREADS)
-  set(Boost_FOUND 0)
-  include(FindBoost)
-  find_package(Boost REQUIRED COMPONENTS system thread)
-  if (NOT Boost_FOUND)
-    message (FATAL_ERROR "Boost library with 'thread' component not found")
-  endif (NOT Boost_FOUND)
+  set(imtools_threads_src src/threads.cxx)
+
+  if (IMTOOLS_THREADS_OPENMP)
+    # OpenMP
+    include(FindOpenMP)
+    find_package(OpenMP)
+
+    if (NOT OPENMP_FOUND)
+      message (FATAL_ERROR "OpenMP is not supported")
+    endif (NOT OPENMP_FOUND)
+
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(imtools_threads_src ${imtools_threads_src} src/OmpGuard.cxx)
+
+    add_definitions(-DUSE_OPENMP)
+  else (IMTOOLS_THREADS_OPENMP)
+    # Boost
+    set(Boost_FOUND 0)
+    include(FindBoost)
+    find_package(Boost REQUIRED COMPONENTS system thread)
+    if (NOT Boost_FOUND)
+      message (FATAL_ERROR "Boost library with 'thread' component not found")
+    endif (NOT Boost_FOUND)
+    set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES} ${Boost_INCLUDE_DIRS}")
+
+    # Threadpool
+    find_path(BOOST_THREADPOOL_INCLUDE_DIRS
+      NAMES threadpool.hpp
+      PATHS ${Boost_INCLUDE_DIRS}
+      PATH_SUFFIXES boost)
+    if (NOT BOOST_THREADPOOL_INCLUDE_DIRS)
+      message (FATAL_ERROR "Threadpool library headers not found")
+    else (NOT BOOST_THREADPOOL_INCLUDE_DIRS)
+      message (STATUS "Found threadpool library in ${BOOST_THREADPOOL_INCLUDE_DIRS}")
+    endif (NOT BOOST_THREADPOOL_INCLUDE_DIRS)
+    set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES}
+    ${BOOST_THREADPOOL_INCLUDE_DIRS}")
+  endif (IMTOOLS_THREADS_OPENMP)
+
   add_definitions(-DIMTOOLS_THREADS)
+else (IMTOOLS_THREADS)
+  set(imtools_threads_src)
 endif (IMTOOLS_THREADS)
 
-set(CMAKE_REQUIRED_INCLUDES "${LIBOPENCV_INCLUDE_DIR} ${Boost_INCLUDE_DIRS}")
+set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES} ${LIBOPENCV_INCLUDE_DIR}")
 set(CMAKE_REQUIRED_LIBRARIES "${LIBOPENCV_CORE_LIB} ${LIBOPENCV_IMGPROC_LIB}
 ${LIBOPENCV_HIGHGUI_LIB}
 ")
 set(LIBS ${LIBS} ${LIBOPENCV_LIBS} ${Boost_LIBRARIES})
 
-set(common_src src/imtools.cxx src/exceptions.cxx src/log.cxx src/threads.cxx)
+set(common_src src/imtools.cxx src/exceptions.cxx src/log.cxx ${imtools_threads_src})
 
 set(imtools_targets immerge)
 if (IMTOOLS_EXTRA)

@@ -13,28 +13,26 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+#include "OmpGuard.hxx"
 
-#include "threads.hxx"
-
-#ifdef IMTOOLS_THREADS
 namespace imtools { namespace threads
 {
 
-it_lock_t io_lock;
 
-
-it_thread_id_t
-get_id()
+OmpGuard::OmpGuard(omp_lock_t& lock)
+: mLock(lock)
 {
-#ifdef USE_OPENMP
-  return omp_get_thread_num();
-#else
-  return boost::this_thread::get_id();
-#endif
+  omp_init_lock(&mLock);
+  omp_set_lock(&mLock);
 }
 
+
+OmpGuard::~OmpGuard()
+{
+  omp_unset_lock(&mLock);
+  omp_destroy_lock(&mLock);
+}
+
+
 }} // namespace imtools::threads
-
-#endif // IMTOOLS_THREADS
-
 // vim: et ts=2 sts=2 sw=2

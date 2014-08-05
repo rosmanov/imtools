@@ -7,14 +7,9 @@ namespace imtools
 {
 
 #ifdef IMTOOLS_THREADS
-using namespace boost::threadpool;
-
 bool g_thread_success = true;
 unsigned g_max_threads = 4;
-
-boost::mutex g_process_images_mutex;
-boost::mutex g_thread_success_mutex;
-
+threads::it_lock_t g_thread_success_lock;
 #endif
 
 

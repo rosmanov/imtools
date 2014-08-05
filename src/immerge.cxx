@@ -317,7 +317,7 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 }
 
 
-#ifdef IMTOOLS_THREADS
+#if defined(IMTOOLS_THREADS) && !defined(USE_OPENMP)
 static void
 process_image_thread_func(image_process_arg_t* ipa)
 {
@@ -328,7 +328,7 @@ process_image_thread_func(image_process_arg_t* ipa)
     warning_log("%s\n", e.what());
   }
 
-  boost::mutex::scoped_lock lock(g_thread_success_mutex);
+  IT_SCOPED_LOCK(lock, g_thread_success_lock);
   g_thread_success = false;
 }
 #endif
@@ -342,7 +342,6 @@ run()
   Point match_loc;
   Mat out_img, diff_img, old_tpl_img, new_tpl_img;
   int i = 0;
-
 
   // Compute difference between g_old_img and g_new_img
 
@@ -358,8 +357,32 @@ run()
 
   assert(g_out_images.size() == g_dst_images.size());
 
+#ifdef USE_OPENMP
+  if (omp_get_dynamic())
+    omp_set_dynamic(0);
+  omp_set_num_threads(g_max_threads);
+  bool r;
+  int n = g_dst_images.size();
+
+#pragma omp parallel for shared(g_dst_images,g_out_images) private(r)
+  for (i = 0; i < n; ++i) {
+    try {
+      r = process_image(g_dst_images[i], diff_img, g_pairs ? &g_out_images[i] : NULL);
+      if (!r) {
+#pragma omp atomic
+        success &= 0;
+      }
+    } catch (ErrorException& e) {
+      warning_log("%s\n", e.what());
+#pragma omp atomic
+      success &= 0;
+    }
+  }
+#else // ! USE_OPENMP = use boost
+  using namespace boost::threadpool;
   pool thread_pool(g_max_threads);
   boost::mutex process_images_mutex;
+
   for (images_vector_t::iterator it = g_dst_images.begin();
       it != g_dst_images.end();
       ++it, ++i)
@@ -373,12 +396,11 @@ run()
     thread_pool.schedule(boost::bind(process_image_thread_func, &img_proc_args[i]));
   }
 
-  assert(n_images == i);
-
   // Wait for threads to finish
-
   thread_pool.wait();
   success = g_thread_success;
+#endif // USE_OPENMP
+
 
   delete [] img_proc_args;
 #else // no threads
