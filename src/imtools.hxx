@@ -50,12 +50,18 @@ using cv::Point;
 #endif
 
 #ifdef IMTOOLS_THREADS
+# ifdef USE_OPENMP
+#  define IMTOOLS_THREADS_BACKEND "OpenMP"
+# else
+#  define IMTOOLS_THREADS_BACKEND "Boost"
+# endif
 # define IMTOOLS_SUFFIX "threaded"
 #else
 # define IMTOOLS_SUFFIX "non-threaded"
 #endif
 
-#define IMTOOLS_FULL_NAME "ImTools " IMTOOLS_VERSION " (" IMTOOLS_BUILD_TYPE ") (" IMTOOLS_SUFFIX ")"
+#define IMTOOLS_FULL_NAME "ImTools " IMTOOLS_VERSION \
+  " " IMTOOLS_BUILD_TYPE " " IMTOOLS_SUFFIX " (" IMTOOLS_THREADS_BACKEND ")"
 #define IMTOOLS_COPYRIGHT "Copyright (C) 2014 - Ruslan Osmanov <rrosmanov@gmail.com>"
 
 #define save_int_opt_arg(__arg, ...)              \
