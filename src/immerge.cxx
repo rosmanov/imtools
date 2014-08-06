@@ -63,7 +63,9 @@ usage(bool is_error)
       THRESHOLD_MOD,
       THRESHOLD_MIN,
       THRESHOLD_MAX,
+#ifdef IMTOOLS_THREADS
       max_threads(),
+#endif
       g_program_name);
 }
 
@@ -334,14 +336,14 @@ process_image_thread_func(image_process_arg_t* ipa)
 #endif
 
 
-static bool
+static int
 run()
 {
-  bool success = true;
-
+  int success = 1;
+  int i;
+  int n_images = g_dst_images.size();
   Point match_loc;
   Mat out_img, diff_img, old_tpl_img, new_tpl_img;
-  int i = 0;
 
   // Compute difference between g_old_img and g_new_img
 
@@ -352,20 +354,21 @@ run()
 
 
 #ifdef IMTOOLS_THREADS
-  int n_images = g_dst_images.size();
+  int num_threads = g_dst_images.size() >= g_max_threads ? g_max_threads : g_dst_images.size();
   auto img_proc_args = new image_process_arg_t[n_images];
 
   assert(g_out_images.size() == g_dst_images.size());
 
 #ifdef USE_OPENMP
+  // Disable setting threads number trough environment variable
   if (omp_get_dynamic())
     omp_set_dynamic(0);
-  omp_set_num_threads(g_max_threads);
-  bool r;
-  int n = g_dst_images.size();
+  omp_set_num_threads(num_threads);
 
-#pragma omp parallel for shared(g_dst_images,g_out_images) private(r)
-  for (i = 0; i < n; ++i) {
+  bool r;
+
+#pragma omp parallel for private(r)
+  for (i = 0; i < n_images; ++i) {
     try {
       r = process_image(g_dst_images[i], diff_img, g_pairs ? &g_out_images[i] : NULL);
       if (!r) {
@@ -380,17 +383,14 @@ run()
   }
 #else // ! USE_OPENMP = use boost
   using namespace boost::threadpool;
-  pool thread_pool(g_max_threads);
+  pool thread_pool(num_threads);
   boost::mutex process_images_mutex;
 
-  for (images_vector_t::iterator it = g_dst_images.begin();
-      it != g_dst_images.end();
-      ++it, ++i)
-  {
+  for (i = 0; i < n_images; ++i) {
     boost::mutex::scoped_lock lock(process_images_mutex);
 
     img_proc_args[i].diff_img = &diff_img;
-    img_proc_args[i].filename = &*it;
+    img_proc_args[i].filename = &g_dst_images[i];
     img_proc_args[i].out_filename = g_pairs ? &g_out_images[i] : NULL;
 
     thread_pool.schedule(boost::bind(process_image_thread_func, &img_proc_args[i]));
@@ -401,19 +401,15 @@ run()
   success = g_thread_success;
 #endif // USE_OPENMP
 
-
   delete [] img_proc_args;
 #else // no threads
-  for (images_vector_t::iterator it = g_dst_images.begin();
-      it != g_dst_images.end();
-      ++it, ++i)
-  {
+  for (i = 0; i < n_images; ++i) {
     try {
-      if (!process_image(*it, diff_img, (g_pairs ? &g_out_images[i] : NULL)))
-        success = false;
+      if (!process_image(g_dst_images[i], diff_img, (g_pairs ? &g_out_images[i] : NULL)))
+        success = 0;
     } catch (ErrorException& e) {
       warning_log("%s\n", e.what());
-      success = false;
+      success = 0;
     }
   }
 #endif // IMTOOLS_THREADS
