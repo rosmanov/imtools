@@ -1,4 +1,6 @@
 #!/bin/bash -
+# Rebuilds everything
+
 set -x
 rm -R CMakeCache.txt CMakeFiles
 cmake $@ .

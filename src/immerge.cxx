@@ -1,5 +1,9 @@
 /**
- * Copyright © 2014 Ruslan Osmanov <rrosmanov@gmail.com>
+ * \file A tool to compute difference between two images and apply the difference
+ * to a number of similar images by means of the OpenCV library.
+ *
+ * \copyright Copyright © 2014,2015 Ruslan Osmanov <rrosmanov@gmail.com>
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,18 +19,13 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
-/**
- * A tool to compute difference between two images and apply the difference
- * to a number of similar images by means of the OpenCV library.
- */
-
 #include "immerge.hxx"
 #include <thread> // std::thread::hardware_concurrency()
 
-using namespace imtools;
-using std::string;
+using namespace imtools::immerge;
 
 
+/// Returns number of concurrent threads supported.
 static inline unsigned
 max_threads()
 {
@@ -34,109 +33,97 @@ max_threads()
 }
 
 
-static void
-init()
-{
-  debug_log0("init()\n");
-
-  // Setup compression parameters
-
-  g_compression_params.push_back(CV_IMWRITE_PNG_STRATEGY);
-  g_compression_params.push_back(cv::IMWRITE_PNG_STRATEGY_FILTERED);
-  g_compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
-  g_compression_params.push_back(9/* 0 -none,  9 - full */);
-#if 0
-  // We don't force specific JPEG quality because the format is lossy.
-  g_compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
-  g_compression_params.push_back(90);
-#endif
-}
-
-
-/// Outputs help text to stdout or stderr depending on IS_ERROR
-
+/// Outputs help message to stdout or stderr depending on `is_error`.
 static void
 usage(bool is_error)
 {
-  fprintf(is_error ? stdout : stderr, usage_template,
+  fprintf(is_error ? stdout : stderr, g_usage_template,
       g_program_name,
-      THRESHOLD_MOD,
+      //THRESHOLD_MOD,
       THRESHOLD_MIN,
-      THRESHOLD_MAX,
+      THRESHOLD_MAX
 #ifdef IMTOOLS_THREADS
-      max_threads(),
+      ,max_threads()
 #endif
-      g_program_name);
+      );
 }
 
 
 /// Loads images specified by the CLI arguments into memory
+///
+/// \param argc The number of elements in `argv`
+/// \param argv Depending on the value of the `g_pairs` global variable `argv` is interpreted as one of the following:
+/// - `g_pairs = true`: list of input and output files: `infile outfile infile2 outfile2 ...`
+/// - `g_pairs = false`: list of output files: `outfile1`
+/// \throws ErrorException
 static void
 load_images(const int argc, char** argv)
 {
-  if (optind < argc) {
-    if (g_pairs) {
-      // ARGV is a list of input and output files: infile outfile infile2 outfile2 ...
+  if (optind >= argc) {
+    strict_log(g_strict, "Target image(s) expected. "
+        "You don't need this tool just to replace one image with another ;)\n");
+    exit(1);
+  }
 
-      for (int i = 0; optind < argc;) {
-        const char* filename = argv[optind++];
+  if (g_pairs) {
+    // `argv` is a list of input and output files:
+    // `infile outfile infile2 outfile2 ...`
 
-        if (i++ % 2 == 0) {
-          if (i > MAX_MERGE_TARGETS) {
-            strict_log(g_strict, "max. number of targets exceeded: %d. "
-                "Skipping the rest.\n", MAX_MERGE_TARGETS);
-            break;
-          }
+    for (uint_t i = 0; optind < argc;) {
+      const char* filename = argv[optind++];
 
-          // Input file
-          if (!file_exists(filename)) {
-            strict_log(g_strict, "image %s doesn't exist.\n", filename);
-            break;
-          }
-          g_dst_images.push_back(filename);
-        } else {
-          // Output file
-          g_out_images.push_back(filename);
-        }
-      }
-
-      // Check if the number of input files matches the number of output files
-
-      if (g_dst_images.size() && g_dst_images.size() != g_out_images.size()) {
-        strict_log(g_strict, "%s file have no pair! Skipping.\n", g_dst_images.back().c_str());
-        g_dst_images.pop_back();
-      }
-    } else { // ARGV is a list of output files
-      for (int i = 0; optind < argc; ++i) {
-        if (i >= MAX_MERGE_TARGETS) {
+      if (i++ % 2 == 0) {
+        if (i > MAX_MERGE_TARGETS) {
           strict_log(g_strict, "max. number of targets exceeded: %d. "
               "Skipping the rest.\n", MAX_MERGE_TARGETS);
           break;
         }
 
-        const char *filename = argv[optind++];
+        // Input file
         if (!file_exists(filename)) {
           strict_log(g_strict, "image %s doesn't exist.\n", filename);
           break;
         }
-        g_dst_images.push_back(filename);
+        g_input_images.push_back(filename);
+      } else {
+        // Output file
+        g_out_images.push_back(filename);
       }
     }
-  } else {
-    strict_log(g_strict, "Target image(s) expected. "
-        "You don't need this tool just to replace one image with another ;)\n");
-    //usage(true);
-    exit(1);
+
+    // Check if the number of input files matches the number of output files
+
+    if (g_input_images.size() && g_input_images.size() != g_out_images.size()) {
+      strict_log(g_strict, "%s file have no pair! Skipping.\n", g_input_images.back().c_str());
+      g_input_images.pop_back();
+    }
+  } else { // `argv` is a list of output files
+    for (uint_t i = 0; optind < argc; ++i) {
+      if (i >= MAX_MERGE_TARGETS) {
+        strict_log(g_strict, "max. number of targets exceeded: %d. "
+            "Skipping the rest.\n", MAX_MERGE_TARGETS);
+        break;
+      }
+
+      const char* const filename = argv[optind++];
+      if (!file_exists(filename)) {
+        strict_log(g_strict, "image %s doesn't exist.\n", filename);
+        break;
+      }
+      g_input_images.push_back(filename);
+    }
+
+    // Input images should exactly match output images in this mode.
+    g_out_images = g_input_images;
   }
 
   if (g_old_image_filename.length() == 0 || g_new_image_filename.length() == 0) {
     strict_log(g_strict, "expected non-empty image paths for comparison.\n");
-    //usage(true);
     exit(1);
   }
 
   // Load the two images which will specify the modificatoin to be applied to
-  // each of g_dst_images; force 3 channels
+  // each of g_input_images; force 3 channels
 
   g_old_img = cv::imread(g_old_image_filename, 1);
   g_new_img = cv::imread(g_new_image_filename, 1);
@@ -150,64 +137,122 @@ load_images(const int argc, char** argv)
 }
 
 
-/// Thread routine applying a patch indicated by bounding box to the output matrix.
-/// @note Is called directly, if there is no threads support.
+/*! Applies a patch using a bounding box.
+ *
+ * \param box Specifies patch area on a canvas of the size of `g_old_img` matrix (of size equal to the size of `g_new_img` matrix).
+ * \param in_img Input image which will be patched.
+ * \param out_img Output image previously cloned from `in_img`.
+ * \param patched_boxes Patches which have been applied on `out_img`
+ */
 static bool
-apply_bounding_box(box_arg_t* pbarg)
+process_patch(const bound_box_t& box, const cv::Mat& in_img, cv::Mat& out_img, bound_box_vector_t& patched_boxes)
 {
-  bool         success       = true;
-  Mat          old_tpl_img;
-  Mat          new_tpl_img;
-  Point        match_loc, match_loc_new;
-  Rect         roi, roi_new;
-  bound_box_t *box;
-  double       avg_mssim;
-  double       avg_mssim_new;
+  bool      success       = true;
+  cv::Mat   old_tpl_img;
+  cv::Mat   new_tpl_img;
+  cv::Point match_loc;
+  cv::Point match_loc_new;
+  cv::Rect  roi;
+  cv::Rect  roi_new;
+  double    avg_mssim;
+  double    avg_mssim_new;
 
-  assert(pbarg && pbarg->box && pbarg->old_img && pbarg->out_img);
-  box = pbarg->box;
-  Rect homo_box(*box);
+  bound_box_t homo_box(box);
 
-  debug_log("apply_bounding_box: %dx%d @ %d;%d\n",
-      box->width, box->height, box->x, box->y);
+  debug_log("%s: %dx%d @ %d;%d\n", __func__, box.width, box.height, box.x, box.y);
 
   try {
-    // The more the box area is heterogeneouson g_old_img, the more chances
+    // The more the box area is heterogeneous on g_old_img, the more chances
     // to match this location on the image being patched.
-    // However, make_heterogeneous() *modifies* the box! So we'll have to restore its size
+    // However, imtools::make_heterogeneous() *modifies* the box! So we'll have to restore its size
     // before patching.
-    make_heterogeneous(/**box*/homo_box, g_old_img);
+    imtools::make_heterogeneous(/**box*/homo_box, g_old_img);
 
-    old_tpl_img = Mat(g_old_img, homo_box);
-    new_tpl_img = Mat(g_new_img, *box);
+    old_tpl_img = cv::Mat(g_old_img, homo_box);
+    new_tpl_img = cv::Mat(g_new_img, box);
 
-    // Find likely location of an area similar to old_tpl_img on the image being processed now
-    match_template(match_loc, *pbarg->old_img, old_tpl_img);
+#if defined(IMTOOLS_DEBUG)
+    {
+      std::ostringstream osstr;
+      osstr << "old_tpl_img_" << box.x << "@" << box.y << "_" << box.width << "x" << box.height << ".jpg";
+      std::string fn = osstr.str();
+      debug_log("* Writing to %s\n", fn.c_str());
+      cv::imwrite(fn, old_tpl_img);
+    }
+    {
+      std::ostringstream osstr;
+      osstr << "new_tpl_img_" << homo_box.x << "@" << homo_box.y << "_" << homo_box.width << "x" << homo_box.height << ".jpg";
+      std::string fn = osstr.str();
+      debug_log("* Writing to %s\n", fn.c_str());
+      cv::imwrite(fn, new_tpl_img);
+    }
+#endif
+
+    // Find likely location of an area similar to old_tpl_img on the image being processed now.
+    imtools::match_template(match_loc, in_img, old_tpl_img);
     // Some patches may already be applied. We'll try to detect if it's so.
-    match_template(match_loc_new, *pbarg->old_img, new_tpl_img);
+    imtools::match_template(match_loc_new, in_img, new_tpl_img);
 
-    if (homo_box != *box) {
-      assert(box->x >= homo_box.x && box->y >= homo_box.y);
+    // Assign regions of interest for old and new images. Then we'll see which of them
+    // matches best.
 
-      roi = cv::Rect(match_loc.x + (box->x - homo_box.x),
-          match_loc.y + (box->y - homo_box.y),
-          box->width, box->height);
+    if (homo_box != box) {
+      // The box has been modified by imtools::make_heterogeneous()
+      assert(box.x >= homo_box.x && box.y >= homo_box.y);
 
+      roi = cv::Rect(match_loc.x + (box.x - homo_box.x), match_loc.y + (box.y - homo_box.y), box.width, box.height);
+      debug_log("homo_box != *box, roi = (%d, %d, %d, %d)\n", roi.x, roi.y, roi.width, roi.height);
     } else {
       roi = cv::Rect(match_loc.x, match_loc.y, old_tpl_img.cols, old_tpl_img.rows);
+      debug_log("homo_box == *box, roi = (%d, %d, %d, %d)\n", roi.x, roi.y, roi.width, roi.height);
     }
     roi_new = cv::Rect(match_loc_new.x, match_loc_new.y, new_tpl_img.cols, new_tpl_img.rows);
+    debug_log("roi_new = (%d, %d, %d, %d)\n", roi_new.x, roi_new.y, roi_new.width, roi_new.height);
 
     // Calculate average similarity
 
-    avg_mssim     = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi));
-    avg_mssim_new = get_avg_MSSIM(new_tpl_img, Mat(*pbarg->out_img, roi_new));
+    avg_mssim     = imtools::get_avg_MSSIM(new_tpl_img, cv::Mat(out_img, roi));
+    avg_mssim_new = imtools::get_avg_MSSIM(new_tpl_img, cv::Mat(out_img, roi_new));
+    debug_log("avg_mssim: %f avg_mssim_new: %f\n", avg_mssim, avg_mssim_new);
 
-    if (avg_mssim_new < avg_mssim) {
-      patch(*pbarg->out_img, new_tpl_img, roi);
-    } else {
-      patch(*pbarg->out_img, new_tpl_img, roi_new);
+#if 0
+    // Check if a patched box intersects roi. If it is not, then we ought to
+    // skip the checks for avg_mssim_new. There is a number of functions computing intersection of different contours, e.g.:
+    // - pointPolygonTest() checks if a point is within a polygon.
+    // - cv::intersectConvexConvex() returns intersection area of two convex polygons (opencv2/imgproc/imgproc.hpp)
+    // However, we'll stick with a simple loop here.
+    bool b_intersection = false;
+    for (bound_box_vector_t::iterator it = patched_boxes.begin(); it != patched_boxes.end(); ++it) {
+      // The `&` operator returns intersection of two rectangles.
+      cv::Rect r = (*it) & roi;
+      if (r.width) {
+        debug_log0("Got intersection\n");
+        b_intersection = true;
+        break;
+      }
     }
+    if (!b_intersection || avg_mssim > avg_mssim_new /*|| avg_mssim < 0*/) {
+#endif
+    if (avg_mssim > avg_mssim_new /*|| avg_mssim < 0*/) {
+      imtools::patch(out_img, new_tpl_img, roi);
+      patched_boxes.push_back(cv::Rect(roi));
+      debug_log("<<<<<<<< Using roi: avg_mssim: %f avg_mssim_new: %f ratio: %f\n",
+          avg_mssim, avg_mssim_new, (avg_mssim_new / avg_mssim));
+    } else {
+      debug_log("<<<<<<<< Using roi_new: avg_mssim: %f avg_mssim_new: %f ratio: %f\n",
+          avg_mssim, avg_mssim_new, (avg_mssim_new / avg_mssim));
+      imtools::patch(out_img, new_tpl_img, roi_new);
+      patched_boxes.push_back(cv::Rect(roi_new));
+    }
+#if 0 && defined(IMTOOLS_DEBUG)
+    {
+      std::ostringstream osstr;
+      osstr << "patched_" << box.x << "@" << box.y << "_" << box.width << "x" << box.height << ".jpg";
+      std::string filename = osstr.str();
+      debug_log("* Writing to %s\n", filename.c_str());
+      cv::imwrite(filename, out_img);
+    }
+#endif
   } catch (ErrorException& e) {
     success = false;
     log::push_error(e.what());
@@ -216,15 +261,17 @@ apply_bounding_box(box_arg_t* pbarg)
     log::push_error("Caught unknown exception!\n");
   }
 
-  return success;
+  return (success);
 }
 
 
-/// Checks if box is suspiciously large (sometimes opencv can produce bounding boxes
-/// embracing smaller boxes, or even entire image!). Looks like OpenCV bug. It
-/// shouldn't return nested rectangles!
+/*! Checks if box is suspiciously large
+ *
+ * Sometimes OpenCV can produce bounding boxes embracing smaller boxes, or even
+ * entire image! Looks like OpenCV bug. It shouldn't return nested rectangles!
+ */
 static inline bool
-_is_huge_bound_box(const bound_box_t& box, const Mat& out_img)
+_is_huge_bound_box(const bound_box_t& box, const cv::Mat& out_img)
 {
   double box_rel_size = box.area() * 100 / out_img.size().area();
   bool result = (box_rel_size > MAX_BOUND_BOX_SIZE_REL);
@@ -232,60 +279,50 @@ _is_huge_bound_box(const bound_box_t& box, const Mat& out_img)
     warning_log("Bounding box is too large: %dx%d (%f%%)\n",
         box.width, box.height, box_rel_size);
   }
-  return result;
+  return (result);
 }
 
 
-/// Applies all patches to the target image
-///
-/// FILENAME - target filename.
-/// DIFF_IMG - binary image with information about differences between
-/// original and modified images, where modified spots have high values.
-/// OUT_FILENAME - optional output filename. If is NULL, result is
-/// written to the output directory.
+/*! Applies all patches on input file and saves the result to specified output file.
+ * The filenames may point to the same file.
+ * \param in_filename filename of input image.
+ * \param out_filename filename of output image.
+ */
 static bool
-process_image(string& filename, cv::Mat& diff_img, string* out_filename)
+process_image(const std::string& in_filename, const std::string& out_filename)
 {
-  bool success = true;
-  int n_boxes;
-  Mat old_img, out_img, old_tpl_img, new_tpl_img;
-  string merged_filename;
+  bool               success         = true;
+  uint_t             n_boxes;
+  cv::Mat            in_img;
+  cv::Mat            out_img;
+  std::string        merged_filename;
   bound_box_vector_t boxes;
+  bound_box_vector_t patched_boxes;
 
-  verbose_log2("Processing target: %s\n", filename.c_str());
-
-  // Load next target forcing 3 channels
-
-  old_img = cv::imread(filename, 1);
-  if (old_img.empty()) {
-    throw ErrorException("empty image skipped: " + filename);
+  // Load target image forcing 3 channels
+  verbose_log2("Processing target: %s\n", in_filename.c_str());
+  in_img = cv::imread(in_filename, 1);
+  if (in_img.empty()) {
+    throw ErrorException("empty image skipped: " + in_filename);
   }
 
-  // Prepare matrix for current target image
+  // Prepare matrix for the output image
+  out_img = in_img.clone();
 
-  out_img = old_img.clone();
-
-  // Generate rectangles bounding clusters of white (changed) pixels on DIFF_IMG
-
-  bound_boxes(boxes, diff_img, g_min_threshold, g_max_threshold);
+  // Generate rectangles bounding clusters of white (changed) pixels on `g_diff_img`
+  imtools::bound_boxes(boxes, g_diff_img, g_min_threshold, g_max_threshold);
   n_boxes = boxes.size();
+  patched_boxes.reserve(n_boxes);
 
-  // Apply the bounding boxes
-
-  for (int i = 0; i < n_boxes; i++) {
-    debug_log("box[%d]: %dx%d\n", i, boxes[i].x, boxes[i].y);
+  // Process the patches
+  for (uint_t i = 0; i < n_boxes; i++) {
+    debug_log("box[%d]: %dx%d @ %d;%d\n", i, boxes[i].width, boxes[i].height, boxes[i].x, boxes[i].y);
 
     if (_is_huge_bound_box(boxes[i], out_img)) {
       continue;
     }
 
-    box_arg_t pbarg;
-    pbarg.box = &boxes[i];
-    pbarg.old_img = &old_img;
-    pbarg.out_img = &out_img;
-    pbarg.filename = &filename;
-
-    if (!apply_bounding_box(&pbarg)) {
+    if (!process_patch(boxes[i], in_img, out_img, patched_boxes)) {
       success = false;
       break;
     }
@@ -293,38 +330,30 @@ process_image(string& filename, cv::Mat& diff_img, string* out_filename)
 
   if (!success) {
     log::warn_all();
-    error_log("%s: failed to process, skipping\n", filename.c_str());
-    return success;
+    error_log("%s: failed to process, skipping\n", in_filename.c_str());
+    return (success);
   }
 
-  // Save merged matrix on filesystem
-
-  merged_filename = out_filename
-    ? out_filename->c_str()
-    : (g_out_dir + "/" + basename(filename.c_str()));
-
-  if (g_strict) {
-    if (file_exists(merged_filename))
-      throw ErrorException("strict mode prohibits writing to existing file " + merged_filename);
+  // Save merged matrix to filesystem
+  if (g_strict && g_pairs && file_exists(out_filename)) {
+    throw ErrorException("strict mode prohibits writing to existing file " + out_filename);
   }
-
-  verbose_log2("Writing to %s\n", merged_filename.c_str());
-  if (!cv::imwrite(merged_filename, out_img, g_compression_params)) {
-    throw FileWriteErrorException(merged_filename);
+  verbose_log2("Writing to %s\n", out_filename.c_str());
+  if (!cv::imwrite(out_filename, out_img, g_compression_params)) {
+    throw FileWriteErrorException(out_filename);
   }
+  verbose_log("[Output] file:%s boxes:%d\n", out_filename.c_str(), n_boxes);
 
-  verbose_log("[Output] file:%s boxes:%d\n", merged_filename.c_str(), n_boxes);
-
-  return success;
+  return (success);
 }
 
 
-#if defined(IMTOOLS_THREADS) && !defined(USE_OPENMP)
+#if defined(IMTOOLS_THREADS) && defined(IMTOOLS_BOOST_LIB)
 static void
-process_image_thread_func(image_process_arg_t* ipa)
+process_image_thread_func(const uint_t i)
 {
   try {
-    if (process_image(*ipa->filename, *ipa->diff_img, ipa->out_filename))
+    if (process_image(g_input_images[i], g_out_images[i]))
       return;
   } catch (ErrorException& e) {
     warning_log("%s\n", e.what());
@@ -333,52 +362,51 @@ process_image_thread_func(image_process_arg_t* ipa)
   IT_SCOPED_LOCK(lock, g_thread_success_lock);
   g_thread_success = false;
 }
-#endif
+#endif // IMTOOLS_THREADS && IMTOOLS_BOOST_LIB
 
 
-static int
+/// The main controller
+static inline bool
 run()
 {
-  int success = 1;
-  int i;
-  int n_images = g_dst_images.size();
-  Point match_loc;
-  Mat out_img, diff_img, old_tpl_img, new_tpl_img;
+  bool      success     = true;
+  uint_t    n_images    = g_input_images.size();
+  uint_t    i;
+  cv::Point match_loc;
+  cv::Mat   out_img;
 
-  // Compute difference between g_old_img and g_new_img
-
+  // Compute difference between `g_old_img` and `g_new_img`
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
-  diff(diff_img, g_old_img, g_new_img, g_mod_threshold);
+  imtools::diff(g_diff_img, g_old_img, g_new_img);
   debug_timer_end(t1, t2, diff);
 
-
 #ifdef IMTOOLS_THREADS
-  int num_threads = g_dst_images.size() >= g_max_threads ? g_max_threads : g_dst_images.size();
-  auto img_proc_args = new image_process_arg_t[n_images];
+  uint_t num_threads = g_input_images.size() >= g_max_threads ? g_max_threads : g_input_images.size();
 
-  assert(g_out_images.size() == g_dst_images.size());
+  assert(g_out_images.size() == g_input_images.size());
 
 #ifdef USE_OPENMP
-  // Disable setting threads number trough environment variable
+  // Disable setting threads number through environment variable
   if (omp_get_dynamic())
     omp_set_dynamic(0);
   omp_set_num_threads(num_threads);
 
   bool r;
-
+  // We'll use `&=` instead of `=` because of restrictions of `omp atomic`.
+  // See http://www-01.ibm.com/support/knowledgecenter/SSXVZZ_8.0.0/com.ibm.xlcpp8l.doc/compiler/ref/ruompatm.htm%23RUOMPATM
 #pragma omp parallel for private(r)
   for (i = 0; i < n_images; ++i) {
     try {
-      r = process_image(g_dst_images[i], diff_img, g_pairs ? &g_out_images[i] : NULL);
+      r = process_image(g_input_images[i], g_out_images[i]);
       if (!r) {
 #pragma omp atomic
-        success &= 0;
+        success &= false;
       }
     } catch (ErrorException& e) {
       warning_log("%s\n", e.what());
 #pragma omp atomic
-      success &= 0;
+      success &= false;
     }
   }
 #else // ! USE_OPENMP = use boost
@@ -388,28 +416,21 @@ run()
 
   for (i = 0; i < n_images; ++i) {
     boost::mutex::scoped_lock lock(process_images_mutex);
-
-    img_proc_args[i].diff_img = &diff_img;
-    img_proc_args[i].filename = &g_dst_images[i];
-    img_proc_args[i].out_filename = g_pairs ? &g_out_images[i] : NULL;
-
-    thread_pool.schedule(boost::bind(process_image_thread_func, &img_proc_args[i]));
+    thread_pool.schedule(boost::bind(process_image_thread_func, i));
   }
 
-  // Wait for threads to finish
-  thread_pool.wait();
+  thread_pool.wait(); // Wait for threads to finish
   success = g_thread_success;
 #endif // USE_OPENMP
 
-  delete [] img_proc_args;
 #else // no threads
   for (i = 0; i < n_images; ++i) {
     try {
-      if (!process_image(g_dst_images[i], diff_img, (g_pairs ? &g_out_images[i] : NULL)))
-        success = 0;
+      if (!process_image(g_input_images[i], g_out_images[i]))
+        success = false;
     } catch (ErrorException& e) {
       warning_log("%s\n", e.what());
-      success = 0;
+      success = false;
     }
   }
 #endif // IMTOOLS_THREADS
@@ -420,9 +441,11 @@ run()
 }
 
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
-  int next_option, exit_code = 0;
+  int next_option;
+  int exit_code   = 0;
 
   g_program_name = argv[0];
 
@@ -434,8 +457,7 @@ int main(int argc, char **argv)
   setvbuf(stdout, NULL, _IONBF, 0); // turn off buffering
 #endif
 
-  // Parse CLI arguments
-
+  debug_log0("Parsing CLI args\n");
   try {
     do {
       next_option = getopt_long(argc, argv, g_short_options, g_long_options, NULL);
@@ -470,9 +492,14 @@ int main(int argc, char **argv)
             break;
           }
 
+#if 0
         case 'm':
           save_int_opt_arg(g_mod_threshold, "Invalid modification threshold");
+          if (g_mod_threshold > 100 || g_mod_threshold < 0) {
+            throw InvalidCliArgException("Modification threshold is out of range");
+          }
           break;
+#endif
 
         case 'L':
           save_int_opt_arg(g_min_threshold, "Invalid min threshold");
@@ -526,18 +553,30 @@ int main(int argc, char **argv)
     } while (next_option != -1);
   } catch (imtools::InvalidCliArgException& e) {
     error_log("%s\n", e.what());
-    //usage(true);
     exit(2);
   }
 
-  debug_log("out-dir: %s\n",       g_out_dir.c_str());
-  debug_log("mod-threshold: %d\n", g_mod_threshold);
-  debug_log("min-threshold: %d\n", g_min_threshold);
-  debug_log("max-threshold: %d\n", g_max_threshold);
-  debug_log("max-threads: %d\n",   g_max_threads);
+  debug_log("out-dir: %s\n",         g_out_dir.c_str());
+#if 0
+  debug_log("mod-threshold: %d%%\n", g_mod_threshold);
+#endif
+  debug_log("min-threshold: %d\n",   g_min_threshold);
+  debug_log("max-threshold: %d\n",   g_max_threshold);
+#ifdef IMTOOLS_THREADS
+  debug_log("max-threads: %d\n",     g_max_threads);
+#endif
 
   try {
-    init();
+    g_compression_params.reserve(4);
+    g_compression_params.push_back(CV_IMWRITE_PNG_STRATEGY);
+    g_compression_params.push_back(cv::IMWRITE_PNG_STRATEGY_FILTERED);
+    g_compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
+    g_compression_params.push_back(9/* 0 -none,  9 - full */);
+#if 0
+    // We don't force specific JPEG quality because the format is lossy.
+    g_compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
+    g_compression_params.push_back(90);
+#endif
 
     debug_timer_init(t1, t2);
     debug_timer_start(t1);

@@ -1,4 +1,4 @@
-/* Copyright (C) 2014  Ruslan Osmanov <rrosmanov@gmail.com>
+/* Copyright © 2014,2015  Ruslan Osmanov <rrosmanov@gmail.com>
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -26,17 +26,23 @@ using std::string;
 namespace imtools { namespace log
 {
 
+#ifdef IMTOOLS_THREADS
+# define IMTOOLS_THREAD_ID imtools::threads::get_id()
+#else
+# define IMTOOLS_THREAD_ID 0
+#endif
+
 #ifdef IMTOOLS_DEBUG
 # define debug_log0(__str)                                                \
   do {                                                                    \
     IT_IO_SCOPED_LOCK(__scoped_lock);                                     \
-    std::cout << "[Debug] [" << imtools::threads::get_id() << "] " __str; \
+    std::cout << "[Debug] [" << IMTOOLS_THREAD_ID << "] " __str; \
   } while (0)
 
 # define debug_log(__fmt, ...)                                      \
   do {                                                              \
     IT_IO_SCOPED_LOCK(__scoped_lock);                               \
-    std::cout << "[Debug] [" << imtools::threads::get_id() << "] "; \
+    std::cout << "[Debug] [" << IMTOOLS_THREAD_ID << "] "; \
     printf(__fmt, __VA_ARGS__) ;                                    \
   } while (0)
 #else

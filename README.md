@@ -71,3 +71,7 @@ Outputs coordinates of the top left corner.
 Tests `imtools::patch()` function.
 
 Copies one image over another at specified location.
+
+## Building documentation
+
+To build documentation run `./build-docs.sh`.

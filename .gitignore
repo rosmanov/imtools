@@ -6,6 +6,7 @@ Makefile
 cmake_install.cmake
 images
 tags
+docs
 *.jpg
 *.png
 *.gif

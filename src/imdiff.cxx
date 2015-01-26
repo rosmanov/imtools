@@ -8,7 +8,7 @@ static std::string g_out_filename;
 
 // Minimum difference between old and new matrix elements specifying
 // whether element is considered to be modified.
-static int g_modification_threshold = 40;
+//static int g_modification_threshold = 40;
 static const int g_max_modification_threshold = 200;
 
 static int g_thresh = 20;
@@ -48,7 +48,7 @@ usage(bool is_error)
 static void
 modification_thresh_callback(int, void*)
 {
-  imtools::diff(g_out, old_img, new_img, g_modification_threshold);
+  imtools::diff(g_out, old_img, new_img);
 
   cv::imshow(result_window_title, g_out);
 }
@@ -96,7 +96,7 @@ show_diff(const std::string& filename_old, const std::string& filename_new)
   cv::createButton("Gauss blur",  blur_callback, (void *) imtools::BLUR_GAUSS,  CV_RADIOBOX);
   cv::createButton("Median blur", blur_callback, (void *) imtools::BLUR_MEDIAN, CV_RADIOBOX);
 
-  cv::createTrackbar(" Mod Thresh:", window_title, &g_modification_threshold, g_max_modification_threshold, modification_thresh_callback);
+  //cv::createTrackbar(" Mod Thresh:", window_title, &g_modification_threshold, g_max_modification_threshold, modification_thresh_callback);
   cv::createTrackbar(" Threshold:",  window_title, &g_thresh,                 g_max_thresh,                 thresh_callback);
 
   cv::imshow(window_title, new_img);

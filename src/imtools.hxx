@@ -1,4 +1,6 @@
-/* Copyright (C) 2014  Ruslan Osmanov <rrosmanov@gmail.com>
+/* \file
+ *
+ * \copyright Copyright © 2014,2015  Ruslan Osmanov <rrosmanov@gmail.com>
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -35,13 +37,8 @@
 #include "log.hxx"
 #include "exceptions.hxx"
 
-using cv::Mat;
-using cv::Rect;
-using cv::Scalar;
-using cv::Point;
 
-
-#define IMTOOLS_VERSION "1.1.0-dev"
+#define IMTOOLS_VERSION "1.2.0"
 
 #ifdef IMTOOLS_DEBUG
 # define IMTOOLS_BUILD_TYPE "debug"
@@ -61,30 +58,32 @@ using cv::Point;
 #endif
 
 #define IMTOOLS_FULL_NAME "ImTools " IMTOOLS_VERSION \
-  " " IMTOOLS_BUILD_TYPE " " IMTOOLS_SUFFIX
-#define IMTOOLS_COPYRIGHT "Copyright (C) 2014 - Ruslan Osmanov <rrosmanov@gmail.com>"
+  "-" IMTOOLS_BUILD_TYPE " " IMTOOLS_SUFFIX
+#define IMTOOLS_COPYRIGHT "Copyright (C) 2014,2015 - Ruslan Osmanov <rrosmanov@gmail.com>"
 
-#define save_int_opt_arg(__arg, ...)              \
-{                                                 \
-  (__arg) = get_int_opt_arg(optarg, __VA_ARGS__); \
+#define save_int_opt_arg(__arg, ...)                       \
+{                                                          \
+  (__arg) = imtools::get_int_opt_arg(optarg, __VA_ARGS__); \
 }
 
 
 namespace imtools {
 
+typedef unsigned int uint_t;
+typedef cv::Rect bound_box_t;
+typedef std::vector<bound_box_t> bound_box_vector_t;
+typedef std::vector<std::string> images_vector_t;
+
 /// Minimum area of a bounding box to be considered "big enough" in square pixels
 /// Bounding boxes having smaller area will be merged together by means of morphological operations.
 const int MIN_BOUND_BOX_AREA = 2800;
 
-/// Verbose mode for CLI output
-/// 0 - off, 1 - verbose, 2 - more verbose
-extern int verbose;
+/// Verbose mode for CLI output:
+/// - 0 - off
+/// - 1 - verbose
+/// - 2 - more verbose
+extern uint_t verbose;
 
-
-typedef unsigned int uint_t;
-typedef Rect bound_box_t;
-typedef std::vector<bound_box_t> bound_box_vector_t;
-typedef std::vector<std::string> images_vector_t;
 
 enum blur_type {
   BLUR_NONE   = 0,
@@ -93,31 +92,23 @@ enum blur_type {
   BLUR_MEDIAN = 3
 };
 
-enum {
-  THRESHOLD_MOD = 40,
+enum threshold_type {
+  /// Default modification threshold (in percents).
+  //THRESHOLD_MOD = 25,
+  /// Default minimum noise suppression threshold.
   THRESHOLD_MIN = 20,
+  /// Default maximum noise suppression threshold.
   THRESHOLD_MAX = 255
 };
 
-struct box_arg_t {
-  bound_box_t *box;
-  Mat         *old_img;
-  Mat         *out_img;
-  std::string *filename;
-};
-
-struct image_process_arg_t {
-  std::string *filename;
-  std::string *out_filename;
-  Mat         *diff_img;
-};
 
 inline bool
-file_exists(const char *filename)
+file_exists(const char* filename)
 {
   struct stat st;
   return (stat(filename, &st) == 0);
 }
+
 
 inline bool
 file_exists(const std::string& filename)
@@ -127,40 +118,51 @@ file_exists(const std::string& filename)
 }
 
 
-int get_int_opt_arg(const char* optarg, const char* format, ...);
+#if 0 // unused
+/// Checks if two paths are pointing to the same file.
+bool equivalent_paths(const char* path1, const char* path2);
+#endif
 
-/// Computes difference between old_img and new_img. The matrix values lower
-/// than mod_threshold are cut down to zeros. Result (1-channel binary image) is
-/// stored in out_img.
-void diff(Mat& out_img, const Mat& old_img, const Mat& new_img,
-    const int mod_threshold = THRESHOLD_MOD);
+int get_int_opt_arg(const char* const optarg, const char* format, ...);
 
-/// Can be used to reduce noise
-void blur(Mat& target, const blur_type type);
+/// Computes difference between two image matrices.
+///
+/// The function tries to do something similar to the command:
+/// `compare old.jpg new.jpg -fuzz 25%  -compose Src -highlight-color White -lowlight-color Black diff.jpg`
+/// (see ImageMagick).
+/// \param result Result of the comparison; 1-channel binary image where differences have high values.
+/// \param a First input matrix
+/// \param b Second input matrix
+void diff(cv::Mat& result , const cv::Mat& old_img, const cv::Mat& new_img);
 
-/// Reduces noise
-void threshold(Mat& target, const int threshold = THRESHOLD_MIN,
+/// Reduces noise by means of blurring the `target` image.
+void blur(cv::Mat& target, const blur_type type);
+
+/// Reduces noise by checking whether pixel values on the `target` image are
+/// within `min_threshold` and `max_threshold`. Pixels having values out of
+/// this range are removed.
+void threshold(cv::Mat& target, const int threshold = THRESHOLD_MIN,
     const int max_threshold = THRESHOLD_MAX);
 
-void match_template(Point& match_loc, const Mat& img, const Mat& tpl);
+void match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl);
 
 /// Patch OUT_MAT at position (X, Y) with contents of TPL_MAT.
-void patch(Mat& out_mat, const Mat& tpl_mat, const Rect& roi);
+void patch(cv::Mat& out_mat, const cv::Mat& tpl_mat, const cv::Rect& roi);
 
-/// Find bounding boxes in mask (can be obtained with diff() + threshold())
-void bound_boxes(bound_box_vector_t& boxes, const Mat& mask,
+/// Find bounding boxes in `mask` (can be obtained with `diff()` followed by `threshold()`)
+void bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask,
     int min_threshold = THRESHOLD_MIN, int max_threshold = THRESHOLD_MAX);
 
-// Get average of the value computed by get_MSSIM()
-double get_avg_MSSIM(const Mat& i1, const Mat& i2);
+/// Get average of the value computed by `get_MSSIM()`
+double get_avg_MSSIM(const cv::Mat& i1, const cv::Mat& i2);
 
 /// Computes structural similarity coefficient, i.e. similarity between i1 and i2 matrices.
 /// Each item of the return value is a number between 0 and 1, where 1 is the perfect match.
-Scalar get_MSSIM(const Mat& i1, const Mat& i2);
+cv::Scalar get_MSSIM(const cv::Mat& i1, const cv::Mat& i2);
 
-/// Detect whether SRC is homogenuous within boundaries of RECT.
+/// Detect whether SRC is homogeneous within boundaries of RECT.
 /// Enlarge RECT until it is heterogeneous, or SRC boundaries are reached.
-void make_heterogeneous(Rect& rect, const Mat& src);
+void make_heterogeneous(cv::Rect& rect, const cv::Mat& src);
 
 } // namespace imtools
 

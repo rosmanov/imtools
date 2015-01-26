@@ -52,7 +52,7 @@ if (IMTOOLS_THREADS)
 
     add_definitions(-DUSE_OPENMP)
   else (IMTOOLS_THREADS_OPENMP)
-    # Boost
+    # Boost library
     set(Boost_FOUND 0)
     include(FindBoost)
     find_package(Boost REQUIRED COMPONENTS system thread)
@@ -61,7 +61,7 @@ if (IMTOOLS_THREADS)
     endif (NOT Boost_FOUND)
     set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES} ${Boost_INCLUDE_DIRS}")
 
-    # Threadpool
+    # Threadpool library
     find_path(BOOST_THREADPOOL_INCLUDE_DIRS
       NAMES threadpool.hpp
       PATHS ${Boost_INCLUDE_DIRS}
@@ -73,7 +73,15 @@ if (IMTOOLS_THREADS)
     endif (NOT BOOST_THREADPOOL_INCLUDE_DIRS)
     set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES}
     ${BOOST_THREADPOOL_INCLUDE_DIRS}")
+
+    add_definitions(-DIMTOOLS_BOOST_LIB)
   endif (IMTOOLS_THREADS_OPENMP)
+
+  # The GNU linker requires dependent libraries to come before their
+  # dependencies. So we'll put `pthreads` to the end of ${Boost_LIBRARIES}.
+  set(CMAKE_THREAD_PREFER_PTHREAD)
+  find_package(Threads)
+  set(Boost_LIBRARIES ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
   add_definitions(-DIMTOOLS_THREADS)
 else (IMTOOLS_THREADS)
@@ -84,8 +92,8 @@ set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES} ${LIBOPENCV_INCLUDE_DIR}
 set(CMAKE_REQUIRED_LIBRARIES "${LIBOPENCV_CORE_LIB} ${LIBOPENCV_IMGPROC_LIB}
 ${LIBOPENCV_HIGHGUI_LIB}
 ")
-set(LIBS ${LIBS} ${LIBOPENCV_LIBS} ${Boost_LIBRARIES})
 
+set(LIBS ${LIBS} ${LIBOPENCV_LIBS} ${Boost_LIBRARIES})
 set(common_src src/imtools.cxx src/exceptions.cxx src/log.cxx ${imtools_threads_src})
 
 set(imtools_targets immerge)
@@ -101,3 +109,4 @@ foreach(exec_item IN ITEMS ${imtools_targets})
 endforeach()
 
 install(TARGETS ${imtools_targets} DESTINATION "bin")
+# vim: et ts=2 sts=2 sw=2

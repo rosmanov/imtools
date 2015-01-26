@@ -1,4 +1,4 @@
-/* Copyright (C) 2014  Ruslan Osmanov <rrosmanov@gmail.com>
+/* Copyright © 2014,2015  Ruslan Osmanov <rrosmanov@gmail.com>
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -16,20 +16,25 @@
 
 #include "imtools.hxx"
 
-using std::string;
-using std::vector;
-using cv::Mat;
-using cv::Rect;
-using cv::Point;
-using cv::Size;
-
 namespace imtools {
 
-int verbose = 0;
+uint_t verbose = 0;
+
+
+#if 0 // unused
+bool
+equivalent_paths(const char* path1, const char* path2)
+{
+  struct stat st1, st2;
+
+  return ((stat(path1, &st1) == 0 && stat(path2, &st2) == 0)
+      && (st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino));
+}
+#endif
 
 
 int
-get_int_opt_arg(const char* optarg, const char* format, ...)
+get_int_opt_arg(const char* const optarg, const char* format, ...)
 {
   if (optarg) {
     char *optarg_end;
@@ -43,13 +48,13 @@ get_int_opt_arg(const char* optarg, const char* format, ...)
 
 err:
   if (format) {
-    string error;
+    std::string error;
 
     va_list args;
     va_start(args, format);
     char message[1024];
-    int message_len = vsnprintf(message, sizeof(message), format, args);
-    error = string(message, message_len);
+    const int message_len = vsnprintf(message, sizeof(message), format, args);
+    error = std::string(message, message_len);
     va_end(args);
 
     throw InvalidCliArgException(error);
@@ -60,28 +65,57 @@ err:
 
 
 void
-diff(Mat& out_img, const Mat& old_img, const Mat& new_img, const int mod_threshold)
+diff(cv::Mat& result, const cv::Mat& a, const cv::Mat& b)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
+#if 0
+  // `mod_threshold` is given in percents.
+  assert(mod_threshold <= 100);
+  mod_threshold /= 100.;
+#endif
+#if 0
   // Select likely modified pixels.
   // We try to something similar to command:
-  // compare old.jpg new.jpg -fuzz 25%  -compose Src -highlight-color White -lowlight-color Black diff.jpg
-  out_img = (old_img - new_img > mod_threshold);
+  // `compare old.jpg new.jpg -fuzz 25%  -compose Src -highlight-color White -lowlight-color Black diff.jpg`
+  //
+  // \note Previously we used an incorrect formula:
+  // `out_img = (a - b> mod_threshold)`
+  // If the values themselves were low (possibly lower than `mod_threshold`,
+  // then we failed to detect these changes!
 
-  // Create matrix of the same size and type as diff_img
-  //out_img.create(diff_img.size(), diff_img.type());
+  result = (cv::abs(a - b) / cv::max(a, b) > mod_threshold);
+#endif
+#if 0
+  cv::Mat diff_mat;
+  cv::Mat max_mat;
+  cv::absdiff(a, b, diff_mat);
+  max_mat = cv::max(a, b);
+  result = ((diff_mat / max_mat) > mod_threshold);
+#endif
+
+  // We coult do fancy things with `result` after cv::absdiff() such as
+  // "magically" adjusting contrast and brightness. However, cv::absdiff()
+  // works just fine with current tests.
+  cv::absdiff(a, b, result);
+  //cv::Mat max_mat;
+  //max_mat = cv::max(a, b);
+  //result = ((result * 255 / max_mat) > mod_threshold);
+  // The following formula roughly describes how
+  // cv::Mat::convertTo(m, rtype, alpha, beta) modifies `result`:
+  // result = contrast * result + brightness,
+  //result.convertTo(result, -1, 0.5, 10);
 
   // Convert to grayscale
-  cv::cvtColor(out_img, out_img, CV_BGR2GRAY);
+  cv::cvtColor(result, result, CV_BGR2GRAY);
 
   debug_timer_end(t1, t2, imtools::diff);
 }
 
 
 void
-blur(Mat& target, const blur_type type)
+blur(cv::Mat& target, const blur_type type)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
@@ -91,11 +125,11 @@ blur(Mat& target, const blur_type type)
       break;
 
     case BLUR:
-      cv::blur(target, target, Size(3, 3));
+      cv::blur(target, target, cv::Size(3, 3));
       break;
 
     case BLUR_GAUSS:
-      cv::GaussianBlur(target, target, Size(3, 3), 10);
+      cv::GaussianBlur(target, target, cv::Size(3, 3), 10);
       break;
 
     case BLUR_MEDIAN:
@@ -111,13 +145,12 @@ blur(Mat& target, const blur_type type)
 
 
 void
-threshold(Mat& target, const int threshold, const int max_threshold)
+threshold(cv::Mat& target, const int threshold, const int max_threshold)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
   assert(max_threshold >= threshold);
-
   cv::threshold(target, target, threshold, max_threshold, cv::THRESH_BINARY);
 
   debug_timer_end(t1, t2, imtools::threshold);
@@ -125,12 +158,12 @@ threshold(Mat& target, const int threshold, const int max_threshold)
 
 
 void
-match_template(Point& match_loc, const Mat& img, const Mat& tpl)
+match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
-  Mat result;
+  cv::Mat result;
   int match_method = CV_TM_SQDIFF;
 
   int result_cols = img.cols - tpl.cols + 1;
@@ -138,13 +171,13 @@ match_template(Point& match_loc, const Mat& img, const Mat& tpl)
   result.create(result_cols, result_rows, CV_32FC1);
 
   cv::matchTemplate(img, tpl, result, match_method);
-  cv::normalize(result, result, 0, 1, cv::NORM_MINMAX, -1, Mat());
+  cv::normalize(result, result, 0, 1, cv::NORM_MINMAX, -1, cv::Mat());
 
   // Localize the best match with minMaxLoc
 
   double min_val, max_val;
-  Point min_loc, max_loc;
-  cv::minMaxLoc(result, &min_val, &max_val, &min_loc, &max_loc, Mat());
+  cv::Point min_loc, max_loc;
+  cv::minMaxLoc(result, &min_val, &max_val, &min_loc, &max_loc, cv::Mat());
 
   // For SQDIFF and SQDIFF_NORMED, the best matches are lower values. For all
   // the other methods, the higher the better
@@ -159,7 +192,7 @@ match_template(Point& match_loc, const Mat& img, const Mat& tpl)
 
 
 void
-patch(Mat& out_mat, const Mat& tpl_mat, const Rect& roi)
+patch(cv::Mat& out_mat, const cv::Mat& tpl_mat, const cv::Rect& roi)
 {
   debug_log("imtools::patch(), x: %d, y: %d\n", roi.x, roi.y);
   debug_timer_init(t1, t2);
@@ -179,10 +212,10 @@ patch(Mat& out_mat, const Mat& tpl_mat, const Rect& roi)
   }
 
   // Region of interest
-  //Rect roi = Rect(pt.x, pt.y, tpl_mat.cols, tpl_mat.rows);
+  //cv::Rect roi = cv::Rect(pt.x, pt.y, tpl_mat.cols, tpl_mat.rows);
 
   // Extract ROI from the output image as a reference
-  Mat out_mat_roi = out_mat(roi);
+  cv::Mat out_mat_roi = out_mat(roi);
 
   // Overwrite the ROI
   tpl_mat.copyTo(out_mat_roi);
@@ -191,56 +224,52 @@ patch(Mat& out_mat, const Mat& tpl_mat, const Rect& roi)
 }
 
 
-/// Merge small rectangles into larger rectangles.
-///
-/// RESULT - output vector. Must be empty on input.
-/// BOXES - input vector of rectangles
-/// BIN_MASK - source binary image
-///
-/// See http://stackoverflow.com/questions/24586923/how-do-i-apply-dilation-selectively-using-opencv?noredirect=1#comment38089974_24586923
+/*! Merge small rectangles into larger rectangles.
+ * \param result Output vector. Must be empty on input.
+ * \param boxes Input vector of rectangles.
+ * \param bin_mask Source binary image.
+ *
+ * See http://stackoverflow.com/questions/24586923/how-do-i-apply-dilation-selectively-using-opencv?noredirect=1#comment38089974_24586923
+ */
 static void
-_merge_small_boxes(bound_box_vector_t& result, bound_box_vector_t& boxes, const Mat& bin_mask)
+_merge_small_boxes(bound_box_vector_t& result, bound_box_vector_t& boxes, const cv::Mat& bin_mask)
 {
-  Mat tmp_mask = bin_mask.clone();
+  cv::Mat tmp_mask = bin_mask.clone();
 
-  // Guess that 1/4 of the boxes will be large enough
+  // Assume that 1/4 of the boxes will be large enough
   result.reserve(boxes.size() >> 2);
 
-  // Store big enough boxes into RESULT
-
+  // Store big enough boxes into `result`
   for (bound_box_vector_t::iterator it = boxes.begin(); it != boxes.end(); ++it) {
     if ((*it).area() >= MIN_BOUND_BOX_AREA) {
       result.push_back(*it);
 
       // Erase the box area on tmp_mask
-      Mat m(tmp_mask, *it);
-      m = Scalar(0);
+      cv::Mat m(tmp_mask, *it);
+      m = cv::Scalar(0);
     }
   }
 
   // Apply morphological closing operation, i.e. erode(dilate(src, kern), kern).
   // With this operation the small boxes should be merged.
-
   int morph_size = 4;
-  Mat kern = cv::getStructuringElement(cv::MORPH_RECT,
-      Size(2 * morph_size + 1, 2 * morph_size + 1),
-      Point(morph_size, morph_size));
-  cv::morphologyEx(tmp_mask, tmp_mask, cv::MORPH_CLOSE, kern, Point(-1, -1), 2);
+  cv::Mat kern = cv::getStructuringElement(cv::MORPH_RECT,
+      cv::Size(2 * morph_size + 1, 2 * morph_size + 1),
+      cv::Point(morph_size, morph_size));
+  cv::morphologyEx(tmp_mask, tmp_mask, cv::MORPH_CLOSE, kern, cv::Point(-1, -1), 2);
 
   // Find new contours the the merged areas
-
-  vector<vector<Point> > contours;
-  vector<cv::Vec4i> hierarchy;
+  std::vector<std::vector<cv::Point> > contours;
+  std::vector<cv::Vec4i> hierarchy;
   cv::findContours(tmp_mask, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
 
   // Collect bounding boxes covering larger areas.
   // Approximate contours to polygons, get bounding rects
-
-  vector<vector<Point> > contours_poly(contours.size());
+  std::vector<std::vector<cv::Point> > contours_poly(contours.size());
   result.reserve(result.size() + contours.size());
   for (size_t i = 0; i < contours.size(); ++i) {
-    cv::approxPolyDP(Mat(contours[i]), contours_poly[i], 1, true);
-    auto m = Mat(contours_poly[i]);
+    cv::approxPolyDP(cv::Mat(contours[i]), contours_poly[i], 1, true);
+    auto m = cv::Mat(contours_poly[i]);
     auto rect = cv::boundingRect(m);
     result.push_back(rect);
   }
@@ -249,13 +278,13 @@ _merge_small_boxes(bound_box_vector_t& result, bound_box_vector_t& boxes, const 
 }
 
 
-/// Will enlarge RECT by step pixels on each side.
-/// Returns true, if at least one side had been changed, otherwise false.
-
+/*! Will enlarge `rect` by step pixels on each side.
+* \returns `true`, if at least one side had been changed, otherwise `false`.
+*/
 static inline bool
-_enlarge(Rect& rect, const Mat& boundary, const int step)
+_enlarge(cv::Rect& rect, const cv::Mat& boundary, const int step)
 {
-  int boundary_touch = 0;
+  uint_t boundary_touch = 0;
 
   if (rect.y > step) {
     rect.y -= step;
@@ -271,8 +300,8 @@ _enlarge(Rect& rect, const Mat& boundary, const int step)
     boundary_touch++;
   }
 
-  // Note, in OpenCV Rect width and height boundaries are exclusive, unlike x and y properties!
-  // See http://docs.opencv.org/modules/core/doc/basic_structures.html?highlight=mat_#rect
+  /// \note In OpenCV cv::Rect width and height boundaries are exclusive, unlike `x` and `y` properties!
+  /// See http://docs.opencv.org/modules/core/doc/basic_structures.html?highlight=mat_#rect
 
   if (boundary.rows > rect.y + rect.height + step) {
     rect.height += step;
@@ -293,7 +322,7 @@ _enlarge(Rect& rect, const Mat& boundary, const int step)
 
 
 void
-make_heterogeneous(Rect& rect, const Mat& src)
+make_heterogeneous(cv::Rect& rect, const cv::Mat& src)
 {
   if (!src.data) {
     error_log("make_heterogeneous: source matrix is empty\n");
@@ -305,7 +334,7 @@ make_heterogeneous(Rect& rect, const Mat& src)
   const double min_ratio = 0.08;
 
   for (int step = 4; step < 1024 ; step += 4) {
-    cv::meanStdDev(Mat(src, rect), mean, stddev);
+    cv::meanStdDev(cv::Mat(src, rect), mean, stddev);
     ratio = stddev[0] / mean[0];
 
     debug_log("make_heterogeneous: ratio = %lf mean = %lf stddev = %lf box: %dx%d @ %d;%d\n",
@@ -326,20 +355,19 @@ make_heterogeneous(Rect& rect, const Mat& src)
 
 
 void
-bound_boxes(bound_box_vector_t& result, const Mat& in_mask, int min_threshold, int max_threshold)
+bound_boxes(bound_box_vector_t& result, const cv::Mat& in_mask, int min_threshold, int max_threshold)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
   bound_box_vector_t boxes;
-  Mat mask;
-  vector<vector<Point> > contours;
-  vector<cv::Vec4i> hierarchy;
+  cv::Mat mask;
+  std::vector<std::vector<cv::Point> > contours;
+  std::vector<cv::Vec4i> hierarchy;
 
   assert(min_threshold >= 0 && min_threshold <= max_threshold);
 
   // Convert image to grayscale
-
   if (mask.channels() < 3) {
     mask = in_mask.clone();
   } else {
@@ -348,7 +376,6 @@ bound_boxes(bound_box_vector_t& result, const Mat& in_mask, int min_threshold, i
   }
 
   // Suppress noise
-
   debug_log("bound_boxes: threshold(%d, %d)\n", min_threshold, max_threshold);
   cv::threshold(mask, mask, min_threshold, max_threshold, cv::THRESH_BINARY);
 #if 0
@@ -356,23 +383,20 @@ bound_boxes(bound_box_vector_t& result, const Mat& in_mask, int min_threshold, i
 #endif
 
   // Apply morphological closing operation, i.e. dilate, then erode (more noise suppression).
-
   int morph_size = 1;
-  Mat kern = cv::getStructuringElement(cv::MORPH_RECT, Size(2 * morph_size + 1, 2 * morph_size + 1), Point(morph_size, morph_size));
-  cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kern, Point(-1, -1), 1);
+  cv::Mat kern = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2 * morph_size + 1, 2 * morph_size + 1), cv::Point(morph_size, morph_size));
+  cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kern, cv::Point(-1, -1), 1);
 
   // Detect contours of modified areas
-
   cv::findContours(mask, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
 
   // Approximate contours to polygons, get bounding boxes
-
-  vector<vector<Point> > contours_poly(contours.size());
+  std::vector<std::vector<cv::Point> > contours_poly(contours.size());
   boxes.reserve(contours.size());
   for (size_t i = 0; i < contours.size(); ++i) {
-    cv::approxPolyDP(Mat(contours[i]), contours_poly[i], 1, true);
+    cv::approxPolyDP(cv::Mat(contours[i]), contours_poly[i], 1, true);
 
-    auto m = Mat(contours_poly[i]);
+    auto m = cv::Mat(contours_poly[i]);
     auto rect = cv::boundingRect(m);
 
     boxes.push_back(rect);
@@ -387,7 +411,7 @@ bound_boxes(bound_box_vector_t& result, const Mat& in_mask, int min_threshold, i
 
 
 double
-get_avg_MSSIM(const Mat& i1, const Mat& i2)
+get_avg_MSSIM(const cv::Mat& i1, const cv::Mat& i2)
 {
   auto mssim = get_MSSIM(i1, i2);
   return (mssim.val[0] + mssim.val[1] + mssim.val[2]) / 3;
@@ -397,40 +421,40 @@ get_avg_MSSIM(const Mat& i1, const Mat& i2)
 /// The code is borrowed from
 /// http://docs.opencv.org/doc/tutorials/highgui/video-input-psnr-ssim/video-input-psnr-ssim.html#image-similarity-psnr-and-ssim
 cv::Scalar
-get_MSSIM(const Mat& i1, const Mat& i2)
+get_MSSIM(const cv::Mat& i1, const cv::Mat& i2)
 {
   const double C1 = 6.5025, C2 = 58.5225;
   int d           = CV_32F;
 
-  Mat I1, I2;
+  cv::Mat I1, I2;
   i1.convertTo(I1, d); // cannot calculate on one byte large values
   i2.convertTo(I2, d);
 
-  Mat I2_2  = I2.mul(I2); // I2^2
-  Mat I1_2  = I1.mul(I1); // I1^2
-  Mat I1_I2 = I1.mul(I2); // I1 * I2
+  cv::Mat I2_2  = I2.mul(I2); // I2^2
+  cv::Mat I1_2  = I1.mul(I1); // I1^2
+  cv::Mat I1_I2 = I1.mul(I2); // I1 * I2
 
 
-  Mat mu1, mu2;
-  cv::GaussianBlur(I1, mu1, Size(11, 11), 1.5);
-  cv::GaussianBlur(I2, mu2, Size(11, 11), 1.5);
+  cv::Mat mu1, mu2;
+  cv::GaussianBlur(I1, mu1, cv::Size(11, 11), 1.5);
+  cv::GaussianBlur(I2, mu2, cv::Size(11, 11), 1.5);
 
-  Mat mu1_2   = mu1.mul(mu1);
-  Mat mu2_2   = mu2.mul(mu2);
-  Mat mu1_mu2 = mu1.mul(mu2);
+  cv::Mat mu1_2   = mu1.mul(mu1);
+  cv::Mat mu2_2   = mu2.mul(mu2);
+  cv::Mat mu1_mu2 = mu1.mul(mu2);
 
-  Mat sigma1_2, sigma2_2, sigma12;
+  cv::Mat sigma1_2, sigma2_2, sigma12;
 
-  cv::GaussianBlur(I1_2, sigma1_2, Size(11, 11), 1.5);
+  cv::GaussianBlur(I1_2, sigma1_2, cv::Size(11, 11), 1.5);
   sigma1_2 -= mu1_2;
 
-  cv::GaussianBlur(I2_2, sigma2_2, Size(11, 11), 1.5);
+  cv::GaussianBlur(I2_2, sigma2_2, cv::Size(11, 11), 1.5);
   sigma2_2 -= mu2_2;
 
-  cv::GaussianBlur(I1_I2, sigma12, Size(11, 11), 1.5);
+  cv::GaussianBlur(I1_I2, sigma12, cv::Size(11, 11), 1.5);
   sigma12 -= mu1_mu2;
 
-  Mat t1, t2, t3;
+  cv::Mat t1, t2, t3;
 
   t1 = 2 * mu1_mu2 + C1;
   t2 = 2 * sigma12 + C2;
@@ -440,12 +464,13 @@ get_MSSIM(const Mat& i1, const Mat& i2)
   t2 = sigma1_2 + sigma2_2 + C2;
   t1 = t1.mul(t2); // t1 =((mu1_2 + mu2_2 + C1).*(sigma1_2 + sigma2_2 + C2))
 
-  Mat ssim_map;
+  cv::Mat ssim_map;
   cv::divide(t3, t1, ssim_map); // ssim_map =  t3./t1;
 
   cv::Scalar mssim = cv::mean(ssim_map); // mssim = average of ssim map
   return mssim;
 }
+
 
 } // namespace imtools
 // vim: et ts=2 sts=2 sw=2
