@@ -21,7 +21,10 @@ As a result, `bin` directory will contain the binaries.
 
 ### Gentoo
 
-See `imtools-9999.ebuild` file at the root of the project.
+```text
+# layman -f -o https://bitbucket.org/osmanov/gentoo-overlay/raw/master/repository.xml -a osmanov-overlay
+# emerge -va media-gfx/imtools
+```
 
 ## Main tools
 

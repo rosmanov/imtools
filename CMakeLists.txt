@@ -7,9 +7,9 @@ include(CMakeDependentOption)
 option(IMTOOLS_DEBUG "Enable debugging support in ImTools" OFF)
 # -D IMTOOLS_THREADS:STRING=ON
 option(IMTOOLS_THREADS "Enable threading" ON)
-# -D IMTOOLS_THREADS_OPENMP:STRING=ON
-cmake_dependent_option(IMTOOLS_THREADS_OPENMP
-  "Use boost libraries for threading" ON
+# -D IMTOOLS_THREADS_BOOST:STRING=OFF
+cmake_dependent_option(IMTOOLS_THREADS_BOOST
+  "Use boost libraries for threading" OFF
   "IMTOOLS_THREADS" OFF)
 # -D IMTOOLS_EXTRA:STRING=OFF
 option(IMTOOLS_EXTRA "Enable extra tools" OFF)
@@ -37,7 +37,7 @@ endif (IMTOOLS_DEBUG)
 if (IMTOOLS_THREADS)
   set(imtools_threads_src src/threads.cxx)
 
-  if (IMTOOLS_THREADS_OPENMP)
+  if (NOT IMTOOLS_THREADS_BOOST)
     # OpenMP
     include(FindOpenMP)
     find_package(OpenMP)
@@ -51,7 +51,7 @@ if (IMTOOLS_THREADS)
     set(imtools_threads_src ${imtools_threads_src} src/OmpGuard.cxx)
 
     add_definitions(-DUSE_OPENMP)
-  else (IMTOOLS_THREADS_OPENMP)
+  else (NOT IMTOOLS_THREADS_BOOST)
     # Boost library
     set(Boost_FOUND 0)
     include(FindBoost)
@@ -75,7 +75,7 @@ if (IMTOOLS_THREADS)
     ${BOOST_THREADPOOL_INCLUDE_DIRS}")
 
     add_definitions(-DIMTOOLS_BOOST_LIB)
-  endif (IMTOOLS_THREADS_OPENMP)
+  endif (NOT IMTOOLS_THREADS_BOOST)
 
   # The GNU linker requires dependent libraries to come before their
   # dependencies. So we'll put `pthreads` to the end of ${Boost_LIBRARIES}.
