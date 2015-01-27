@@ -38,7 +38,7 @@
 #include "exceptions.hxx"
 
 
-#define IMTOOLS_VERSION "1.2.0-r1"
+#define IMTOOLS_VERSION "1.2.1"
 
 #ifdef IMTOOLS_DEBUG
 # define IMTOOLS_BUILD_TYPE "debug"
