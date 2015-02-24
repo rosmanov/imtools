@@ -14,3 +14,4 @@ docs
 *.out
 *.log
 *.zip
+tmp

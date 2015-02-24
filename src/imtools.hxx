@@ -32,6 +32,7 @@
 #include <ctime>
 #include <cstdarg>
 #include <unistd.h>
+#include <sstream> // istringstream
 
 #include "threads.hxx"
 #include "log.hxx"
@@ -61,10 +62,16 @@
   "-" IMTOOLS_BUILD_TYPE " " IMTOOLS_SUFFIX
 #define IMTOOLS_COPYRIGHT "Copyright (C) 2014,2015 - Ruslan Osmanov <rrosmanov@gmail.com>"
 
-#define save_int_opt_arg(__arg, ...)                       \
-{                                                          \
-  (__arg) = imtools::get_int_opt_arg(optarg, __VA_ARGS__); \
+#define save_int_opt_arg(__arg, ...)                        \
+{                                                           \
+  (__arg) = imtools::get_opt_arg<int>(optarg, __VA_ARGS__); \
 }
+
+#define save_double_opt_arg(__arg, ...)                        \
+{                                                              \
+  (__arg) = imtools::get_opt_arg<double>(optarg, __VA_ARGS__); \
+}
+
 
 
 namespace imtools {
@@ -117,13 +124,39 @@ file_exists(const std::string& filename)
   return (stat(filename.c_str(), &st) == 0);
 }
 
+template <class T> T
+get_opt_arg(const string& optarg, const char* format, ...)
+{
+  T result;
+  std::istringstream is(optarg);
+
+  if (is >> result) {
+    return result;
+  }
+
+  if (!format) {
+    throw ErrorException("Invalid error format in %s", __func__ );
+  }
+
+  std::string error;
+  va_list args;
+  va_start(args, format);
+  char message[1024];
+  const int message_len = vsnprintf(message, sizeof(message), format, args);
+  error = std::string(message, message_len);
+  va_end(args);
+  throw InvalidCliArgException(error);
+}
+
+template int get_opt_arg(const string& optarg, const char* format, ...);
+template double get_opt_arg(const string& optarg, const char* format, ...);
 
 #if 0 // unused
 /// Checks if two paths are pointing to the same file.
 bool equivalent_paths(const char* path1, const char* path2);
 #endif
 
-int get_int_opt_arg(const char* const optarg, const char* format, ...);
+//int get_int_opt_arg(const char* const optarg, const char* format, ...);
 
 /// Computes difference between two image matrices.
 ///
