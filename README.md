@@ -35,6 +35,10 @@ to a number of similar images.
 
 Can be useful to update a logo on a number of images.
 
+### imresize
+
+Thumbnail maker.
+
 ## Extra tools
 
 These are small programs designed for testing functions declared in

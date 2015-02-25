@@ -69,10 +69,11 @@ const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "%1$s -s src.png -o out.png --fx 0.5 --fy 0.5\n";
 
 // CLI arguments.
-const char *g_short_options = "hvs:o:W:H:X:Y:I:";
+const char *g_short_options = "hvVs:o:W:H:X:Y:I:";
 const struct option g_long_options[] = {
   {"help",          no_argument,       NULL, 'h'},
   {"verbose",       no_argument,       NULL, 'v'},
+  {"version",       no_argument,       NULL, 'V'},
   {"source",        required_argument, NULL, 's'},
   {"output",        required_argument, NULL, 'o'},
   {"width",         optional_argument, NULL, 'W'},

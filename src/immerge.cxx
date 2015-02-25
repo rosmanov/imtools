@@ -536,6 +536,10 @@ main(int argc, char **argv)
           g_strict++;
           break;
 
+        case 'V':
+          print_version();
+          exit(0);
+
         case -1:
           // done with options
           break;

@@ -39,7 +39,7 @@
 #include "template.cxx"
 
 
-#define IMTOOLS_VERSION "1.2.1"
+#define IMTOOLS_VERSION "1.3.0"
 
 #ifdef IMTOOLS_DEBUG
 # define IMTOOLS_BUILD_TYPE "debug"
@@ -58,22 +58,23 @@
 # define IMTOOLS_SUFFIX "non-threaded"
 #endif
 
+
 #define IMTOOLS_FULL_NAME "ImTools " IMTOOLS_VERSION \
   "-" IMTOOLS_BUILD_TYPE " " IMTOOLS_SUFFIX
 #define IMTOOLS_COPYRIGHT "Copyright (C) 2014,2015 - Ruslan Osmanov <rrosmanov@gmail.com>"
 
-#define save_int_opt_arg(__arg, ...)                        \
-{                                                           \
-  (__arg) = optarg ? imtools::get_opt_arg<int>(optarg, __VA_ARGS__) : 0; \
+#define save_int_opt_arg(__arg, ...)                                        \
+{                                                                           \
+  (__arg) = optarg ? imtools::get_opt_arg<int>(optarg, __VA_ARGS__) : 0;    \
 }
 
-#define save_uint_opt_arg(__arg, ...)                        \
-{                                                           \
+#define save_uint_opt_arg(__arg, ...)                                       \
+{                                                                           \
   (__arg) = optarg ? imtools::get_opt_arg<uint_t>(optarg, __VA_ARGS__) : 0; \
 }
 
-#define save_double_opt_arg(__arg, ...)                        \
-{                                                              \
+#define save_double_opt_arg(__arg, ...)                                     \
+{                                                                           \
   (__arg) = optarg ? imtools::get_opt_arg<double>(optarg, __VA_ARGS__) : 0; \
 }
 
@@ -113,6 +114,8 @@ enum threshold_type {
   THRESHOLD_MAX = 255
 };
 
+
+void print_version();
 
 inline bool
 file_exists(const char* filename)

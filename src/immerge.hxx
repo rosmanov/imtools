@@ -110,7 +110,7 @@ const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "To apply changes between old.png and new.png to old2.png (old2.png will be overwritten):\n"
 "%1$s -o old.png -n new.png old2.png\n";
 
-const char *g_short_options = "hvsn:o:d:pm:L:H:"
+const char *g_short_options = "hvVsn:o:d:pm:L:H:"
 #ifdef IMTOOLS_THREADS
   "T:"
 #endif
@@ -120,6 +120,7 @@ const char *g_short_options = "hvsn:o:d:pm:L:H:"
 const struct option g_long_options[] = {
   {"help",          no_argument,       NULL, 'h'},
   {"verbose",       no_argument,       NULL, 'v'},
+  {"version",       no_argument,       NULL, 'V'},
   {"strict",        no_argument,       NULL, 's'},
   {"new-image",     required_argument, NULL, 'n'},
   {"old-image",     required_argument, NULL, 'o'},

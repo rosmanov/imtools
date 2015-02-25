@@ -21,6 +21,21 @@ namespace imtools {
 uint_t verbose = 0;
 
 
+void
+print_version()
+{
+  printf("Version: " IMTOOLS_FULL_NAME "\n"
+      "Copyright: " IMTOOLS_COPYRIGHT "\n"
+      "Features: " IMTOOLS_THREADS_BACKEND
+#ifdef IMTOOLS_EXTRA
+      " ExtraTools"
+#endif
+#ifdef IMTOOLS_DEBUG_PROFILER
+      " DebugProfiler"
+#endif
+      "\n\n");
+}
+
 #if 0 // unused
 bool
 equivalent_paths(const char* path1, const char* path2)

@@ -99,6 +99,7 @@ set(common_src src/imtools.cxx src/exceptions.cxx src/log.cxx ${imtools_threads_
 set(imtools_targets immerge imresize)
 if (IMTOOLS_EXTRA)
   set(imtools_targets ${imtools_targets} imdiff impatch imtpl imboundboxes)
+  add_definitions(-DIMTOOLS_EXTRA)
 endif (IMTOOLS_EXTRA)
 
 include_directories(${LIBOPENCV_INCLUDE_DIR})
