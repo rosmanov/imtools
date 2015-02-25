@@ -37,7 +37,23 @@ bool run()
   cv::Mat source;
   cv::Mat output;
 
-  // XXX
+  source = cv::imread(g_source_image_filename, 1);
+  if (source.empty()) {
+    throw ErrorException("Source image is empty");
+  }
+
+  if (g_width > 0 && g_height > 0) {
+    cv::resize(source, output, cv::Size(g_width, g_height), g_fx, g_fy, g_interpolation);
+  } else if (g_fx > 0 && g_fy > 0) {
+    cv::resize(source, output, cv::Size(), g_fx, g_fy, g_interpolation);
+  } else {
+    throw ErrorException("Expected positive number pairs of whether width/height, or fx/fy."
+        "None provided. Nothing to do.");
+  }
+
+  if (!cv::imwrite(g_output_image_filename, output, g_compression_params)) {
+    throw FileWriteErrorException(g_output_image_filename);
+  }
 
   return true;
 }
@@ -77,17 +93,17 @@ main(int argc, char **argv)
           break;
 
         case 'W':
-          save_int_opt_arg(g_width, "Invalid width\n");
+          save_uint_opt_arg(g_width, "Invalid width\n");
           break;
 
         case 'H':
-          save_int_opt_arg(g_width, "Invalid height\n");
+          save_uint_opt_arg(g_height, "Invalid height\n");
           break;
 
         case 'I':
           {
             std::string s_interpolation = optarg;
-            if (s_interpolation == "nearest")       g_interpolation = cv::INTER_NEAREST;
+            if      (s_interpolation == "nearest")  g_interpolation = cv::INTER_NEAREST;
             else if (s_interpolation == "linear")   g_interpolation = cv::INTER_LINEAR;
             else if (s_interpolation == "area")     g_interpolation = cv::INTER_AREA;
             else if (s_interpolation == "cubic")    g_interpolation = cv::INTER_CUBIC;
@@ -130,9 +146,9 @@ main(int argc, char **argv)
     exit(2);
   }
 
-  debug_log("Source image: %s\n",         g_source_image_filename.c_str());
-  debug_log("Output image: %s\n",         g_output_image_filename.c_str());
-  debug_log("Thumbnail size: %ux%u\n",    g_width, g_height);
+  debug_log("Source image:  s\n",      g_source_image_filename.c_str());
+  debug_log("Output image:  s\n",      g_output_image_filename.c_str());
+  debug_log("Thumbnail size:  ux u\n", g_width, g_height);
 
   try {
     g_compression_params.reserve(4);

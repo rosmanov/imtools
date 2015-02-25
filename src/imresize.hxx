@@ -27,9 +27,9 @@ std::string g_source_image_filename;
 /// Output image path
 std::string g_output_image_filename;
 /// Output image width
-uint_t g_width;
+uint_t g_width = 0;
 /// Output image height
-uint_t g_height;
+uint_t g_height = 0;
 /// Scale factor along the horizontal axis.
 double g_fx;
 /// Scale factor along the vertical axis.
@@ -45,16 +45,16 @@ const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "A simple tool to make thumbnails.\n"
 "Usage: %1$s OPTIONS IMAGES\n\n"
 "OPTIONS:\n"
-" -h, --help                 Display this help.\n"
-" -v, --verbose              Turn on verbose output. Can be used multiple times\n"
-"                            to increase verbosity (e.g. -vv). Default: off.\n"
-" -s, --source                Path to source image.\n"
-" -o, --output                Path to output image.\n"
-" -W, --width                 Width of the output image.\n"
-" -H, --height                Height of the output image.\n"
-" -X, --fx                    Scale factor along the horizontal axis.\n"
-" -Y, --fy                    Scale factor along the vertical axis.\n"
-" -I, --interpolation         Interpolation method. Possible values:\n"
+" -h, --help               Display this help.\n"
+" -v, --verbose            Turn on verbose output. Can be used multiple times\n"
+"                          to increase verbosity (e.g. -vv). Default: off.\n"
+" -s, --source             Path to source image.\n"
+" -o, --output             Path to output image.\n"
+" -W, --width              Width of the output image.\n"
+" -H, --height             Height of the output image.\n"
+" -X, --fx                 Scale factor along the horizontal axis.\n"
+" -Y, --fy                 Scale factor along the vertical axis.\n"
+" -I, --interpolation      Interpolation method. Possible values:\n"
 "    nearest  - a nearest-neighbor interpolation\n"
 "    linear   - a bilinear interpolation (used by default)\n"
 "    area     - resampling using pixel area relation. It may be a preferred\n"
@@ -64,17 +64,19 @@ const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "    lanczos4 - a Lanczos interpolation over 8x8 pixel neighborhood\n"
 "\nEXAMPLE:\n\n"
 "The following command makes a 90x100px thumbnail from src.png and writes the result into out.png\n"
-"%1$s -s src.png -o out.png -W 90 -H 100\n";
+"%1$s -s src.png -o out.png -W 90 -H 100\n\n"
+"To decimate the image by factor of 2 in each direction\n"
+"%1$s -s src.png -o out.png --fx 0.5 --fy 0.5\n";
 
 // CLI arguments.
-const char *g_short_options = "hvs:o:W:H:X::Y::I::";
+const char *g_short_options = "hvs:o:W::H::X::Y::I::";
 const struct option g_long_options[] = {
   {"help",          no_argument,       NULL, 'h'},
   {"verbose",       no_argument,       NULL, 'v'},
   {"source",        required_argument, NULL, 's'},
   {"output",        required_argument, NULL, 'o'},
-  {"width",         required_argument, NULL, 'W'},
-  {"height",        required_argument, NULL, 'H'},
+  {"width",         optional_argument, NULL, 'W'},
+  {"height",        optional_argument, NULL, 'H'},
   {"fx",            optional_argument, NULL, 'X'},
   {"fy",            optional_argument, NULL, 'Y'},
   {"interpolation", optional_argument, NULL, 'I'},
