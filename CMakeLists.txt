@@ -96,7 +96,7 @@ ${LIBOPENCV_HIGHGUI_LIB}
 set(LIBS ${LIBS} ${LIBOPENCV_LIBS} ${Boost_LIBRARIES})
 set(common_src src/imtools.cxx src/exceptions.cxx src/log.cxx ${imtools_threads_src})
 
-set(imtools_targets immerge)
+set(imtools_targets immerge imresize)
 if (IMTOOLS_EXTRA)
   set(imtools_targets ${imtools_targets} imdiff impatch imtpl imboundboxes)
 endif (IMTOOLS_EXTRA)

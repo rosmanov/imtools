@@ -36,6 +36,7 @@
 #include "threads.hxx"
 #include "log.hxx"
 #include "exceptions.hxx"
+#include "template.cxx"
 
 
 #define IMTOOLS_VERSION "1.2.1"
@@ -61,10 +62,21 @@
   "-" IMTOOLS_BUILD_TYPE " " IMTOOLS_SUFFIX
 #define IMTOOLS_COPYRIGHT "Copyright (C) 2014,2015 - Ruslan Osmanov <rrosmanov@gmail.com>"
 
-#define save_int_opt_arg(__arg, ...)                       \
-{                                                          \
-  (__arg) = imtools::get_int_opt_arg(optarg, __VA_ARGS__); \
+#define save_int_opt_arg(__arg, ...)                        \
+{                                                           \
+  (__arg) = optarg ? imtools::get_opt_arg<int>(optarg, __VA_ARGS__) : 0; \
 }
+
+#define save_uint_opt_arg(__arg, ...)                        \
+{                                                           \
+  (__arg) = optarg ? imtools::get_opt_arg<uint_t>(optarg, __VA_ARGS__) : 0; \
+}
+
+#define save_double_opt_arg(__arg, ...)                        \
+{                                                              \
+  (__arg) = optarg ? imtools::get_opt_arg<double>(optarg, __VA_ARGS__) : 0; \
+}
+
 
 
 namespace imtools {
@@ -117,13 +129,16 @@ file_exists(const std::string& filename)
   return (stat(filename.c_str(), &st) == 0);
 }
 
+template int get_opt_arg(const string& optarg, const char* format, ...);
+template uint_t get_opt_arg(const string& optarg, const char* format, ...);
+template double get_opt_arg(const string& optarg, const char* format, ...);
 
 #if 0 // unused
 /// Checks if two paths are pointing to the same file.
 bool equivalent_paths(const char* path1, const char* path2);
 #endif
 
-int get_int_opt_arg(const char* const optarg, const char* format, ...);
+//int get_int_opt_arg(const char* const optarg, const char* format, ...);
 
 /// Computes difference between two image matrices.
 ///
