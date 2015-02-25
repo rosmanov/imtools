@@ -64,12 +64,12 @@ const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "    lanczos4 - a Lanczos interpolation over 8x8 pixel neighborhood\n"
 "\nEXAMPLE:\n\n"
 "The following command makes a 90x100px thumbnail from src.png and writes the result into out.png\n"
-"%1$s -s src.png -o out.png --width=90 --height=100\n\n"
+"%1$s -s src.png -o out.png -W 90 -H 100\n\n"
 "To decimate the image by factor of 2 in each direction\n"
-"%1$s -s src.png -o out.png --fx=0.5 --fy=0.5\n";
+"%1$s -s src.png -o out.png --fx 0.5 --fy 0.5\n";
 
 // CLI arguments.
-const char *g_short_options = "hvs:o:W::H::X::Y::I::";
+const char *g_short_options = "hvs:o:W:H:X:Y:I:";
 const struct option g_long_options[] = {
   {"help",          no_argument,       NULL, 'h'},
   {"verbose",       no_argument,       NULL, 'v'},
