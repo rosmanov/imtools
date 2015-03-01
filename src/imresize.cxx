@@ -150,9 +150,9 @@ main(int argc, char **argv)
     exit(2);
   }
 
-  debug_log("Source image:  s\n",      g_source_image_filename.c_str());
-  debug_log("Output image:  s\n",      g_output_image_filename.c_str());
-  debug_log("Thumbnail size:  ux u\n", g_width, g_height);
+  debug_log("Source image: %s\n",      g_source_image_filename.c_str());
+  debug_log("Output image: %s\n",      g_output_image_filename.c_str());
+  debug_log("Thumbnail size: %ux%u\n", g_width, g_height);
 
   try {
     g_compression_params.reserve(4);
