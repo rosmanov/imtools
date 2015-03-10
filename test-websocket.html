@@ -1,0 +1,48 @@
+<html>
+  <head>
+    <title>WebSocket Echo Test</title>
+    <script>
+    function init() {
+      var uri = "ws://127.0.0.1:9809";
+
+      websocket = new WebSocket(uri);
+      websocket.onopen = function() {
+        document.getElementById("output").innerHTML += "<p>&gt; CONNECTED to " + uri + "</p>";
+      };
+      websocket.onmessage = function(evt) {
+        document.getElementById("output").innerHTML += "<p style='color: blue;'>&gt; RESPONSE: " + evt.data + "</p>";
+      };
+      websocket.onerror = function(evt) {
+        var msg;
+
+        if (evt.data)
+          msg = evt.data;
+        else if (websocket.readyState == 0)
+          msg = "Failed to open connection"
+        else if (websocket.readyState == 3)
+          msg = "Connection closed"
+        else
+          msg = 'unknown';
+
+        msg += ", URI: " + uri;
+
+        document.getElementById("output").innerHTML += "<p style='color: red;'>&gt; ERROR: " + msg + "</p>";
+      };
+    }
+
+    function sendMessage(message) {
+      document.getElementById("output").innerHTML += "<p>&gt; SENT: " + message + "</p>";
+      if (typeof message == 'object') message = JSON.stringify(message);
+      websocket.send(message);
+    }
+    window.addEventListener("load", init, false);
+    </script>
+  </head>
+  <body>
+    <b>Message to send:</b>
+    <input onkeypress="if(this.value) {if (window.event.keyCode == 13) { sendMessage(this.value); this.value = null; }}"/>
+    <input type="button" name="b" id="b" value="send object"
+    onclick="sendMessage({command: 'imresize', arguments:{'source':'/some/path/to/image.png', 'output':'/some/path/to/output.png', 'verbose': 1}})" />
+    <div id="output"></div>
+  </body>
+</html>

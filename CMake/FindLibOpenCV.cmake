@@ -1,3 +1,8 @@
+if (FindLibOpenCV_included)
+  return()
+endif (FindLibOpenCV_included)
+set(FindLibOpenCV_included true)
+
 foreach(prefix IN ITEMS /usr/local /usr /opt /opt/local "$ENV{HOME}")
   list(APPEND LibOpenCV_INCLUDE_PATHS "${prefix}/include")
   list(APPEND LibOpenCV_LIB_PATHS "${prefix}/lib")

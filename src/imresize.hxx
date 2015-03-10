@@ -16,12 +16,13 @@
 #ifndef IMTOOLS_IMRESIZE_HXX
 #define IMTOOLS_IMRESIZE_HXX
 #include "imtools.hxx"
-
+#include "imresize-api.hxx"
 
 namespace imtools { namespace imresize {
 using namespace imtools;
 
 const char* g_program_name;
+
 /// Source image path
 std::string g_source_image_filename;
 /// Output image path
@@ -31,14 +32,12 @@ uint_t g_width = 0;
 /// Output image height
 uint_t g_height = 0;
 /// Scale factor along the horizontal axis.
-double g_fx;
+double g_fx = 0.;
 /// Scale factor along the vertical axis.
-double g_fy;
+double g_fy = 0.;
 /// Interpolation method
 int g_interpolation = cv::INTER_LINEAR;
 
-/// Format-specific save parameters for `cv::imwrite()`.
-std::vector<int> g_compression_params;
 
 /// Template for `printf`-like function.
 const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
@@ -46,6 +45,7 @@ const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "Usage: %1$s OPTIONS IMAGES\n\n"
 "OPTIONS:\n"
 " -h, --help               Display this help.\n"
+" -V, --version            Print version\n"
 " -v, --verbose            Turn on verbose output. Can be used multiple times\n"
 "                          to increase verbosity (e.g. -vv). Default: off.\n"
 " -s, --source             Path to source image.\n"
@@ -76,11 +76,11 @@ const struct option g_long_options[] = {
   {"version",       no_argument,       NULL, 'V'},
   {"source",        required_argument, NULL, 's'},
   {"output",        required_argument, NULL, 'o'},
-  {"width",         optional_argument, NULL, 'W'},
-  {"height",        optional_argument, NULL, 'H'},
-  {"fx",            optional_argument, NULL, 'X'},
-  {"fy",            optional_argument, NULL, 'Y'},
-  {"interpolation", optional_argument, NULL, 'I'},
+  {"width",         required_argument, NULL, 'W'},
+  {"height",        required_argument, NULL, 'H'},
+  {"fx",            required_argument, NULL, 'X'},
+  {"fy",            required_argument, NULL, 'Y'},
+  {"interpolation", required_argument, NULL, 'I'},
   {0,               0,                 0,    0}
 };
 

@@ -26,9 +26,17 @@ print_version()
 {
   printf("Version: " IMTOOLS_FULL_NAME "\n"
       "Copyright: " IMTOOLS_COPYRIGHT "\n"
-      "Features: " IMTOOLS_THREADS_BACKEND
+      "Features:"
+#ifdef IMTOOLS_THREADS_BACKEND
+      " " IMTOOLS_THREADS_BACKEND
+#else
+      " Non-threaded"
+#endif
 #ifdef IMTOOLS_EXTRA
       " ExtraTools"
+#endif
+#ifdef IMTOOLS_DEBUG
+      " Debug"
 #endif
 #ifdef IMTOOLS_DEBUG_PROFILER
       " DebugProfiler"
@@ -36,16 +44,6 @@ print_version()
       "\n\n");
 }
 
-#if 0 // unused
-bool
-equivalent_paths(const char* path1, const char* path2)
-{
-  struct stat st1, st2;
-
-  return ((stat(path1, &st1) == 0 && stat(path2, &st2) == 0)
-      && (st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino));
-}
-#endif
 
 void
 diff(cv::Mat& result, const cv::Mat& a, const cv::Mat& b)
@@ -57,8 +55,7 @@ diff(cv::Mat& result, const cv::Mat& a, const cv::Mat& b)
   // `mod_threshold` is given in percents.
   assert(mod_threshold <= 100);
   mod_threshold /= 100.;
-#endif
-#if 0
+
   // Select likely modified pixels.
   // We try to something similar to command:
   // `compare old.jpg new.jpg -fuzz 25%  -compose Src -highlight-color White -lowlight-color Black diff.jpg`
@@ -67,28 +64,27 @@ diff(cv::Mat& result, const cv::Mat& a, const cv::Mat& b)
   // `out_img = (a - b> mod_threshold)`
   // If the values themselves were low (possibly lower than `mod_threshold`,
   // then we failed to detect these changes!
-
   result = (cv::abs(a - b) / cv::max(a, b) > mod_threshold);
-#endif
-#if 0
+
   cv::Mat diff_mat;
   cv::Mat max_mat;
   cv::absdiff(a, b, diff_mat);
   max_mat = cv::max(a, b);
   result = ((diff_mat / max_mat) > mod_threshold);
-#endif
 
-  // We coult do fancy things with `result` after cv::absdiff() such as
-  // "magically" adjusting contrast and brightness. However, cv::absdiff()
-  // works just fine with current tests.
-  cv::absdiff(a, b, result);
-  //cv::Mat max_mat;
-  //max_mat = cv::max(a, b);
-  //result = ((result * 255 / max_mat) > mod_threshold);
+  cv::Mat max_mat;
+  max_mat = cv::max(a, b);
+  result = ((result * 255 / max_mat) > mod_threshold);
   // The following formula roughly describes how
   // cv::Mat::convertTo(m, rtype, alpha, beta) modifies `result`:
   // result = contrast * result + brightness,
-  //result.convertTo(result, -1, 0.5, 10);
+  result.convertTo(result, -1, 0.5, 10);
+#endif
+
+  // We could do fancy things with `result` after cv::absdiff() such as
+  // "magically" adjusting contrast and brightness. However, cv::absdiff()
+  // works just fine with current tests.
+  cv::absdiff(a, b, result);
 
   // Convert to grayscale
   cv::cvtColor(result, result, CV_BGR2GRAY);

@@ -21,6 +21,11 @@
 
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
+
+#ifdef IMTOOLS_THREADS
+# include <thread> // std::thread::hardware_concurrency()
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
@@ -65,17 +70,17 @@
 
 #define save_int_opt_arg(__arg, ...)                                        \
 {                                                                           \
-  (__arg) = optarg ? imtools::get_opt_arg<int>(optarg, __VA_ARGS__) : 0;    \
+  (__arg) = optarg ? ::imtools::get_opt_arg<int>(optarg, __VA_ARGS__) : 0;    \
 }
 
 #define save_uint_opt_arg(__arg, ...)                                       \
 {                                                                           \
-  (__arg) = optarg ? imtools::get_opt_arg<uint_t>(optarg, __VA_ARGS__) : 0; \
+  (__arg) = optarg ? ::imtools::get_opt_arg<uint_t>(optarg, __VA_ARGS__) : 0; \
 }
 
 #define save_double_opt_arg(__arg, ...)                                     \
 {                                                                           \
-  (__arg) = optarg ? imtools::get_opt_arg<double>(optarg, __VA_ARGS__) : 0; \
+  (__arg) = optarg ? ::imtools::get_opt_arg<double>(optarg, __VA_ARGS__) : 0; \
 }
 
 
@@ -116,6 +121,16 @@ enum threshold_type {
 
 
 void print_version();
+
+#ifdef IMTOOLS_THREADS
+/// Returns number of concurrent threads supported.
+inline unsigned
+max_threads()
+{
+  return std::thread::hardware_concurrency();
+}
+#endif
+
 
 inline bool
 file_exists(const char* filename)

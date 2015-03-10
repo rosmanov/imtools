@@ -13,7 +13,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
-
 #ifndef IMTOOLS_THREADS_HXX
 #define IMTOOLS_THREADS_HXX
 
@@ -28,13 +27,20 @@
 // macro!
 #  define IT_IO_SCOPED_LOCK(l) imtools::threads::OmpGuard l(imtools::threads::io_lock)
 #  define IT_SCOPED_LOCK(l,v) imtools::threads::OmpGuard l((v))
-# else
+
+#  define IT_INIT_OPENMP(__num_threads) do { \
+  /* Disable setting threads number through environment variable */ \
+  if (omp_get_dynamic()) omp_set_dynamic(0); \
+  omp_set_num_threads((__num_threads)); \
+} while (0)
+
+# else // ! USE_OPENMP = use boost
 #  include <boost/thread/mutex.hpp>
 #  include <boost/bind.hpp>
 #  include <boost/threadpool.hpp>
 #  define IT_IO_SCOPED_LOCK(l) boost::mutex::scoped_lock l(imtools::threads::io_lock)
 #  define IT_SCOPED_LOCK(l,v) boost::mutex::scoped_lock l((v))
-# endif
+# endif // USE_OPENMP
 
 namespace imtools { namespace threads
 {
@@ -42,7 +48,7 @@ namespace imtools { namespace threads
 # ifdef USE_OPENMP
 typedef int        it_thread_id_t;
 typedef omp_lock_t it_lock_t;
-# else
+# else // ! USE_OPENMP = use boost
 typedef boost::thread::id it_thread_id_t;
 typedef boost::mutex      it_lock_t;
 # endif

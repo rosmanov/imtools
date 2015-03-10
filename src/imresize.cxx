@@ -23,39 +23,14 @@
 
 using namespace imtools::imresize;
 
+typedef ::imtools::imresize::Command Command;
+
 
 /// Outputs help message to stdout or stderr depending on `is_error`.
 static void
 usage(bool is_error)
 {
   fprintf(is_error ? stdout : stderr, g_usage_template, g_program_name);
-}
-
-
-bool run()
-{
-  cv::Mat source;
-  cv::Mat output;
-
-  source = cv::imread(g_source_image_filename, 1);
-  if (source.empty()) {
-    throw ErrorException("Source image is empty");
-  }
-
-  if (g_width > 0 && g_height > 0) {
-    cv::resize(source, output, cv::Size(g_width, g_height), g_fx, g_fy, g_interpolation);
-  } else if (g_fx > 0 && g_fy > 0) {
-    cv::resize(source, output, cv::Size(), g_fx, g_fy, g_interpolation);
-  } else {
-    throw ErrorException("Expected positive number pairs of whether width/height, or fx/fy."
-        "None provided. Nothing to do.");
-  }
-
-  if (!cv::imwrite(g_output_image_filename, output, g_compression_params)) {
-    throw FileWriteErrorException(g_output_image_filename);
-  }
-
-  return true;
 }
 
 
@@ -155,15 +130,9 @@ main(int argc, char **argv)
   debug_log("Thumbnail size: %ux%u\n", g_width, g_height);
 
   try {
-    g_compression_params.reserve(4);
-    g_compression_params.push_back(CV_IMWRITE_PNG_STRATEGY);
-    g_compression_params.push_back(cv::IMWRITE_PNG_STRATEGY_FILTERED);
-    g_compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
-    g_compression_params.push_back(9/* 0 -none,  9 - full */);
-
-    if (!run()) {
-      exit_code = 1;
-    }
+    ResizeCommand cmd(g_source_image_filename, g_output_image_filename,
+        g_width, g_height, g_fx, g_fy, g_interpolation);
+    cmd.run();
   } catch (ErrorException& e) {
     error_log("%s\n", e.what());
     exit_code = 1;

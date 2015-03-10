@@ -87,6 +87,7 @@ const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "Arguments specifying the target image paths.\n\n"
 "OPTIONS:\n"
 " -h, --help                 Display this help.\n"
+" -V, --version              Print version\n"
 " -v, --verbose              Turn on verbose output. Can be used multiple times\n"
 "                            to increase verbosity (e.g. -vv). Default: off.\n"
 " -s, --strict               Turn some warnings into fatal errors. Can be used multiple times\n"
@@ -124,15 +125,15 @@ const struct option g_long_options[] = {
   {"strict",        no_argument,       NULL, 's'},
   {"new-image",     required_argument, NULL, 'n'},
   {"old-image",     required_argument, NULL, 'o'},
-  {"out-dir",       optional_argument, NULL, 'd'},
+  {"out-dir",       required_argument, NULL, 'd'},
   {"pairs",         no_argument,       NULL, 'p'},
 #if 0
-  {"mod-threshold", optional_argument, NULL, 'm'},
+  {"mod-threshold", required_argument, NULL, 'm'},
 #endif
-  {"min-threshold", optional_argument, NULL, 'L'},
-  {"max-threshold", optional_argument, NULL, 'H'},
+  {"min-threshold", required_argument, NULL, 'L'},
+  {"max-threshold", required_argument, NULL, 'H'},
 #ifdef IMTOOLS_THREADS
-  {"max-threads",   optional_argument, NULL, 'T'},
+  {"max-threads",   required_argument, NULL, 'T'},
 #endif
   {0,               0,                 0,    0}
 };

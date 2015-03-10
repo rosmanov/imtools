@@ -16,6 +16,8 @@ option(IMTOOLS_EXTRA "Enable extra tools" OFF)
 # -D IMTOOLS_DEBUG_PROFILER:STRING=OFF
 cmake_dependent_option(IMTOOLS_DEBUG_PROFILER "Enable profiling info in debug messages" OFF
   "IMTOOLS_DEBUG" OFF)
+# -D IMTOOLS_SERVER:STRING=OFF
+option(IMTOOLS_SERVER "Enable WebSocket server" OFF)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
@@ -34,8 +36,40 @@ else (IMTOOLS_DEBUG)
   set (CMAKE_BUILD_TYPE "Release")
 endif (IMTOOLS_DEBUG)
 
+if (IMTOOLS_SERVER OR IMTOOLS_THREADS_BOOST)
+  # Boost library
+  list (APPEND IMTOOLS_BOOST_COMPONENTS system)
+  if (IMTOOLS_THREADS_BOOST)
+    list (APPEND IMTOOLS_BOOST_COMPONENTS thread)
+  endif (IMTOOLS_THREADS_BOOST)
+  set(Boost_FOUND 0)
+  include(FindBoost)
+  find_package(Boost REQUIRED COMPONENTS ${IMTOOLS_BOOST_COMPONENTS})
+  if (NOT Boost_FOUND)
+    message (FATAL_ERROR "Boost library with '${IMTOOLS_BOOST_COMPONENTS}' components not found")
+  endif (NOT Boost_FOUND)
+
+  # The GNU linker requires dependent libraries to come before their
+  # dependencies. So we'll put `pthreads` to the end of ${Boost_LIBRARIES}.
+  set(CMAKE_THREAD_PREFER_PTHREAD)
+  find_package(Threads)
+  list(APPEND Boost_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
+
+  # Websocketpp library
+  find_package(websocketpp "0.5.0" REQUIRED)
+  if (WEBSOCKETPP_FOUND)
+    message (STATUS "Found websocketpp in ${WEBSOCKETPP_INCLUDE_DIR}")
+  else (WEBSOCKETPP_FOUND)
+    message (FATAL_ERROR "websocketpp package not found")
+  endif (WEBSOCKETPP_FOUND)
+  include_directories(${WEBSOCKETPP_INCLUDE_DIR})
+
+  set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES}
+  ${Boost_INCLUDE_DIRS} ${WEBSOCKETPP_INCLUDE_DIR}")
+endif (IMTOOLS_SERVER OR IMTOOLS_THREADS_BOOST)
+
 if (IMTOOLS_THREADS)
-  set(imtools_threads_src src/threads.cxx)
+  list(APPEND imtools_threads_src src/threads.cxx)
 
   if (NOT IMTOOLS_THREADS_BOOST)
     # OpenMP
@@ -48,19 +82,10 @@ if (IMTOOLS_THREADS)
 
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    set(imtools_threads_src ${imtools_threads_src} src/OmpGuard.cxx)
+    list(APPEND imtools_threads_src src/OmpGuard.cxx)
 
     add_definitions(-DUSE_OPENMP)
   else (NOT IMTOOLS_THREADS_BOOST)
-    # Boost library
-    set(Boost_FOUND 0)
-    include(FindBoost)
-    find_package(Boost REQUIRED COMPONENTS system thread)
-    if (NOT Boost_FOUND)
-      message (FATAL_ERROR "Boost library with 'thread' component not found")
-    endif (NOT Boost_FOUND)
-    set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES} ${Boost_INCLUDE_DIRS}")
-
     # Threadpool library
     find_path(BOOST_THREADPOOL_INCLUDE_DIRS
       NAMES threadpool.hpp
@@ -74,40 +99,52 @@ if (IMTOOLS_THREADS)
     set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES}
     ${BOOST_THREADPOOL_INCLUDE_DIRS}")
 
-    add_definitions(-DIMTOOLS_BOOST_LIB)
+    ## The GNU linker requires dependent libraries to come before their
+    ## dependencies. So we'll put `pthreads` to the end of ${Boost_LIBRARIES}.
+    #set(CMAKE_THREAD_PREFER_PTHREAD)
+    #find_package(Threads)
+    #list(APPEND Boost_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
+
+    add_definitions(-DIMTOOLS_THREADS_BOOST)
   endif (NOT IMTOOLS_THREADS_BOOST)
 
-  # The GNU linker requires dependent libraries to come before their
-  # dependencies. So we'll put `pthreads` to the end of ${Boost_LIBRARIES}.
-  set(CMAKE_THREAD_PREFER_PTHREAD)
-  find_package(Threads)
-  set(Boost_LIBRARIES ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
-
   add_definitions(-DIMTOOLS_THREADS)
-else (IMTOOLS_THREADS)
-  set(imtools_threads_src)
 endif (IMTOOLS_THREADS)
 
 set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES} ${LIBOPENCV_INCLUDE_DIR}")
 set(CMAKE_REQUIRED_LIBRARIES "${LIBOPENCV_CORE_LIB} ${LIBOPENCV_IMGPROC_LIB}
-${LIBOPENCV_HIGHGUI_LIB}
-")
+${LIBOPENCV_HIGHGUI_LIB}")
 
-set(LIBS ${LIBS} ${LIBOPENCV_LIBS} ${Boost_LIBRARIES})
-set(common_src src/imtools.cxx src/exceptions.cxx src/log.cxx ${imtools_threads_src})
+list(APPEND LIBS ${LIBOPENCV_LIBS} ${Boost_LIBRARIES})
+list(APPEND common_src src/imtools.cxx src/exceptions.cxx src/log.cxx ${imtools_threads_src})
 
-set(imtools_targets immerge imresize)
+list(APPEND imtools_targets immerge imresize)
 if (IMTOOLS_EXTRA)
-  set(imtools_targets ${imtools_targets} imdiff impatch imtpl imboundboxes)
+  list(APPEND imtools_targets imdiff impatch imtpl imboundboxes)
   add_definitions(-DIMTOOLS_EXTRA)
 endif (IMTOOLS_EXTRA)
 
 include_directories(${LIBOPENCV_INCLUDE_DIR})
 
 foreach(exec_item IN ITEMS ${imtools_targets})
-  add_executable(${exec_item} src/${exec_item}.cxx ${common_src})
+  set(src_api src/${exec_item}-api.cxx)
+  set(src src/${exec_item}.cxx ${common_src})
+
+  if (EXISTS ${src_api})
+    list(APPEND src ${src_api} src/Command.cxx)
+    list(APPEND src_api_list ${src_api})
+  endif (EXISTS ${src_api})
+
+  add_executable(${exec_item} ${src})
   target_link_libraries(${exec_item} ${LIBS})
 endforeach()
+
+if (IMTOOLS_SERVER)
+  add_definitions(-DIMTOOLS_SERVER)
+  add_executable(imserver src/imserver.cxx ${src_api_list} src/Command.cxx ${common_src})
+  target_link_libraries(imserver ${LIBS})
+  list(APPEND imtools_targets imserver)
+endif (IMTOOLS_SERVER)
 
 install(TARGETS ${imtools_targets} DESTINATION "bin")
 # vim: et ts=2 sts=2 sw=2

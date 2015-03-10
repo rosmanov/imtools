@@ -20,17 +20,11 @@
  */
 
 #include "immerge.hxx"
-#include <thread> // std::thread::hardware_concurrency()
 
 using namespace imtools::immerge;
-
-
-/// Returns number of concurrent threads supported.
-static inline unsigned
-max_threads()
-{
-  return std::thread::hardware_concurrency();
-}
+#ifdef IMTOOLS_THREADS
+using imtools::max_threads;
+#endif // IMTOOLS_THREADS
 
 
 /// Outputs help message to stdout or stderr depending on `is_error`.
@@ -348,7 +342,7 @@ process_image(const std::string& in_filename, const std::string& out_filename)
 }
 
 
-#if defined(IMTOOLS_THREADS) && defined(IMTOOLS_BOOST_LIB)
+#ifdef IMTOOLS_THREADS_BOOST
 static void
 process_image_thread_func(const uint_t i)
 {
@@ -362,7 +356,7 @@ process_image_thread_func(const uint_t i)
   IT_SCOPED_LOCK(lock, g_thread_success_lock);
   g_thread_success = false;
 }
-#endif // IMTOOLS_THREADS && IMTOOLS_BOOST_LIB
+#endif // IMTOOLS_THREADS_BOOST
 
 
 /// The main controller
@@ -387,35 +381,31 @@ run()
   assert(g_out_images.size() == g_input_images.size());
 
 #ifdef USE_OPENMP
-  // Disable setting threads number through environment variable
-  if (omp_get_dynamic())
-    omp_set_dynamic(0);
-  omp_set_num_threads(num_threads);
+  IT_INIT_OPENMP(num_threads);
 
   bool r;
   // We'll use `&=` instead of `=` because of restrictions of `omp atomic`.
   // See http://www-01.ibm.com/support/knowledgecenter/SSXVZZ_8.0.0/com.ibm.xlcpp8l.doc/compiler/ref/ruompatm.htm%23RUOMPATM
-#pragma omp parallel for private(r)
+  _Pragma("omp parallel for private(r)")
   for (i = 0; i < n_images; ++i) {
     try {
       r = process_image(g_input_images[i], g_out_images[i]);
       if (!r) {
-#pragma omp atomic
+        _Pragma("omp atomic")
         success &= false;
       }
     } catch (ErrorException& e) {
       warning_log("%s\n", e.what());
-#pragma omp atomic
+      _Pragma("omp atomic")
       success &= false;
     }
   }
 #else // ! USE_OPENMP = use boost
-  using namespace boost::threadpool;
-  pool thread_pool(num_threads);
+  boost::threadpool::pool thread_pool(num_threads);
   boost::mutex process_images_mutex;
 
   for (i = 0; i < n_images; ++i) {
-    boost::mutex::scoped_lock lock(process_images_mutex);
+    IT_SCOPED_LOCK(lock, process_images_mutex);
     thread_pool.schedule(boost::bind(process_image_thread_func, i));
   }
 
