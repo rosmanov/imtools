@@ -20,6 +20,8 @@
  */
 
 #include "imresize.hxx"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
 
 using namespace imtools::imresize;
 
@@ -123,6 +125,10 @@ main(int argc, char **argv)
   } catch (imtools::InvalidCliArgException& e) {
     error_log("%s\n", e.what());
     exit(2);
+  }
+
+  if (!g_interpolation) {
+    g_interpolation = cv::INTER_LINEAR;
   }
 
   debug_log("Source image: %s\n",      g_source_image_filename.c_str());

@@ -20,7 +20,14 @@
  */
 #include "imresize-api.hxx"
 
-using namespace imtools::imresize;
+#include <string>
+#include "log.hxx"
+#include "exceptions.hxx"
+
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+
+using imtools::imresize::ResizeCommand;
 
 typedef ::imtools::Command::element_vector_t element_vector_t;
 typedef ::imtools::Command::element_t element_t;
@@ -32,7 +39,7 @@ ResizeCommand::ResizeCommand(const std::string& source,
     uint_t height,
     double fx,
     double fy,
-    int interpolation)
+    int interpolation) noexcept
 : m_source(source),
   m_output(output),
   m_width(width),
@@ -44,7 +51,7 @@ ResizeCommand::ResizeCommand(const std::string& source,
 }
 
 
-ResizeCommand::ResizeCommand(const element_vector_t& elements)
+ResizeCommand::ResizeCommand(const element_vector_t& elements) noexcept
 {
   for (auto& it : elements) {
     std::string value = it.second.data();
@@ -69,7 +76,7 @@ ResizeCommand::ResizeCommand(const element_vector_t& elements)
 
 /// Returns numeric representation of option name for comparisions.
 int
-ResizeCommand::getOptionCode(const std::string& o) const
+ResizeCommand::getOptionCode(const std::string& o) const noexcept
 {
   Option code;
 
@@ -122,7 +129,7 @@ ResizeCommand::run() const
         "None provided. Nothing to do.");
   }
 
-  if (!cv::imwrite(m_output, output, getCompressionParams())) {
+  if (!cv::imwrite(m_output, output, Command::getCompressionParams())) {
     throw FileWriteErrorException(m_output);
   }
 }

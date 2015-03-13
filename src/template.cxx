@@ -15,12 +15,23 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+#pragma once
+#include <cstdarg>
 #include <sstream> // istringstream
+#include <string>
+#include "exceptions.hxx"
+#include "imtools-types.hxx"
 
 namespace imtools {
+/////////////////////////////////////////////////////////////////////
+
+class ErrorException;
+class InvalidCliArgException;
+
+/////////////////////////////////////////////////////////////////////
 
 template <class T> T
-get_opt_arg(const string& optarg, const char* format, ...)
+get_opt_arg(const std::string& optarg, const char* format, ...)
 {
   T result;
   std::istringstream is(optarg);
@@ -43,5 +54,10 @@ get_opt_arg(const string& optarg, const char* format, ...)
   throw InvalidCliArgException(error);
 }
 
+template int get_opt_arg(const std::string& optarg, const char* format, ...);
+template uint_t get_opt_arg(const std::string& optarg, const char* format, ...);
+template double get_opt_arg(const std::string& optarg, const char* format, ...);
+
+/////////////////////////////////////////////////////////////////////
 } //namespace imtools
 // vim: et ts=2 sts=2 sw=2

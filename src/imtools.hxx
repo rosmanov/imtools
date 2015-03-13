@@ -16,57 +16,25 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
+#pragma once
 #ifndef IMTOOLS_HXX
 #define IMTOOLS_HXX
 
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
+#include "template.cxx"
 
 #ifdef IMTOOLS_THREADS
 # include <thread> // std::thread::hardware_concurrency()
 #endif
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <vector>
-#include <getopt.h>
-#include <sys/stat.h>
-#include <stdexcept>
-#include <cassert>
-#include <cerrno>
-#include <ctime>
-#include <cstdarg>
-#include <unistd.h>
+#include <opencv2/core/core.hpp>
 
 #include "threads.hxx"
 #include "log.hxx"
 #include "exceptions.hxx"
-#include "template.cxx"
+#include "imtools-meta.hxx"
+#include "imtools-types.hxx"
 
-
-#define IMTOOLS_VERSION "1.3.0"
-
-#ifdef IMTOOLS_DEBUG
-# define IMTOOLS_BUILD_TYPE "debug"
-#else
-# define IMTOOLS_BUILD_TYPE "release"
-#endif
-
-#ifdef IMTOOLS_THREADS
-# ifdef USE_OPENMP
-#  define IMTOOLS_THREADS_BACKEND "OpenMP"
-# else
-#  define IMTOOLS_THREADS_BACKEND "Boost"
-# endif
-# define IMTOOLS_SUFFIX "threaded" "(" IMTOOLS_THREADS_BACKEND ")"
-#else
-# define IMTOOLS_SUFFIX "non-threaded"
-#endif
-
-
-#define IMTOOLS_FULL_NAME "ImTools " IMTOOLS_VERSION \
-  "-" IMTOOLS_BUILD_TYPE " " IMTOOLS_SUFFIX
-#define IMTOOLS_COPYRIGHT "Copyright (C) 2014,2015 - Ruslan Osmanov <rrosmanov@gmail.com>"
+/////////////////////////////////////////////////////////////////////
 
 #define save_int_opt_arg(__arg, ...)                                        \
 {                                                                           \
@@ -84,13 +52,9 @@
 }
 
 
-
+/////////////////////////////////////////////////////////////////////
 namespace imtools {
 
-typedef unsigned int uint_t;
-typedef cv::Rect bound_box_t;
-typedef std::vector<bound_box_t> bound_box_vector_t;
-typedef std::vector<std::string> images_vector_t;
 
 /// Minimum area of a bounding box to be considered "big enough" in square pixels
 /// Bounding boxes having smaller area will be merged together by means of morphological operations.
@@ -101,24 +65,6 @@ const int MIN_BOUND_BOX_AREA = 2800;
 /// - 1 - verbose
 /// - 2 - more verbose
 extern uint_t verbose;
-
-
-enum blur_type {
-  BLUR_NONE   = 0,
-  BLUR        = 1,
-  BLUR_GAUSS  = 2,
-  BLUR_MEDIAN = 3
-};
-
-enum threshold_type {
-  /// Default modification threshold (in percents).
-  //THRESHOLD_MOD = 25,
-  /// Default minimum noise suppression threshold.
-  THRESHOLD_MIN = 20,
-  /// Default maximum noise suppression threshold.
-  THRESHOLD_MAX = 255
-};
-
 
 void print_version();
 
@@ -132,24 +78,8 @@ max_threads()
 #endif
 
 
-inline bool
-file_exists(const char* filename)
-{
-  struct stat st;
-  return (stat(filename, &st) == 0);
-}
-
-
-inline bool
-file_exists(const std::string& filename)
-{
-  struct stat st;
-  return (stat(filename.c_str(), &st) == 0);
-}
-
-template int get_opt_arg(const string& optarg, const char* format, ...);
-template uint_t get_opt_arg(const string& optarg, const char* format, ...);
-template double get_opt_arg(const string& optarg, const char* format, ...);
+bool file_exists(const char* filename);
+bool file_exists(const std::string& filename);
 
 #if 0 // unused
 /// Checks if two paths are pointing to the same file.
@@ -197,7 +127,7 @@ cv::Scalar get_MSSIM(const cv::Mat& i1, const cv::Mat& i2);
 /// Enlarge RECT until it is heterogeneous, or SRC boundaries are reached.
 void make_heterogeneous(cv::Rect& rect, const cv::Mat& src);
 
+/////////////////////////////////////////////////////////////////////
 } // namespace imtools
-
 #endif // IMTOOLS_HXX
 // vim: et ts=2 sts=2 sw=2

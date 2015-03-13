@@ -13,12 +13,30 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+#include <sys/stat.h>
 
 #include "imtools.hxx"
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 namespace imtools {
 
 uint_t verbose = 0;
+
+
+bool
+file_exists(const char* filename)
+{
+  struct stat st;
+  return (stat(filename, &st) == 0);
+}
+
+bool
+file_exists(const std::string& filename)
+{
+  struct stat st;
+  return (stat(filename.c_str(), &st) == 0);
+}
 
 
 void

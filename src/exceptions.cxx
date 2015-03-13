@@ -1,16 +1,17 @@
-#include "imtools.hxx"
+#include <cstdarg>
+#include <stdexcept>
+#include <string>
+#include <sstream>
+#include "exceptions.hxx"
+#include "opencv2/highgui/highgui.hpp"
 
 using std::ostringstream;
 using std::string;
-using std::runtime_error;
-using cv::Mat;
-using cv::Point;
 
-namespace imtools
-{
+namespace imtools {
 
 ErrorException::ErrorException(const char* format, ...)
-  : runtime_error("")
+  : std::runtime_error("")
 {
   if (format) {
     va_list args;
@@ -23,7 +24,7 @@ ErrorException::ErrorException(const char* format, ...)
 }
 
 
-TemplateOutOfBoundsException::TemplateOutOfBoundsException(const Mat& tplMat, const Mat& outMat, const Rect& roi)
+TemplateOutOfBoundsException::TemplateOutOfBoundsException(const cv::Mat& tplMat, const cv::Mat& outMat, const cv::Rect& roi)
 {
   ostringstream ostr;
 
@@ -43,7 +44,7 @@ FileWriteErrorException::FileWriteErrorException(string filename)
 }
 
 
-LowMssimException::LowMssimException(double mssim, Rect& roi, string& filename)
+LowMssimException::LowMssimException(double mssim, cv::Rect& roi, string& filename)
 {
   ostringstream ostr;
 

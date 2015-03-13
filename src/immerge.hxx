@@ -13,8 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+#pragma once
 #ifndef IMTOOLS_IMMERGE_HXX
 #define IMTOOLS_IMMERGE_HXX
+#include <getopt.h>
 #include "imtools.hxx"
 
 namespace imtools { namespace immerge {

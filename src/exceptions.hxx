@@ -14,17 +14,18 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
-
+#pragma once
 #ifndef IMTOOLS_EXCEPTIONS_HXX
 #define IMTOOLS_EXCEPTIONS_HXX
 
-#include "imtools.hxx"
+#include <iosfwd>
+#include <string>
+#include <stdexcept>
+
+#include "opencv-fwd.hxx"
 
 using std::runtime_error;
 using std::string;
-using cv::Point;
-using cv::Mat;
-using cv::Rect;
 
 namespace imtools {
 
@@ -45,7 +46,7 @@ class ErrorException : public runtime_error
 class TemplateOutOfBoundsException: public ErrorException
 {
   public:
-    TemplateOutOfBoundsException(const Mat& tplMat, const Mat& outMat, const Rect& roi);
+    TemplateOutOfBoundsException(const cv::Mat& tplMat, const cv::Mat& outMat, const cv::Rect& roi);
     virtual ~TemplateOutOfBoundsException() throw() {}
 };
 
@@ -61,7 +62,7 @@ class FileWriteErrorException: public ErrorException
 class LowMssimException: public ErrorException
 {
   public:
-    LowMssimException(double mssim, Rect& roi, string& filename);
+    LowMssimException(double mssim, cv::Rect& roi, string& filename);
     virtual ~LowMssimException() throw() {}
 };
 

@@ -17,30 +17,78 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
-// XXX  Make per-process instances of Server, don't keep list of servers (at
-// least in children).
+
 #include "imserver.hxx"
 
+#include <signal.h>
+#include <sys/wait.h>
+#include <algorithm> // for std::transform()
+#include <iterator> // for std::back_inserter()
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+
+#include "imtools.hxx"
+
 #define IMTOOLS_SERVER_OBJECT_LOG(__type, fmt, ...) \
-  __type ## _log("[%s:%u] " fmt, m_host.c_str(), m_port, __VA_ARGS__)
+  __type ## _log("[%s:%u] " fmt, getHost().c_str(), getPort(), __VA_ARGS__)
 #define IMTOOLS_SERVER_OBJECT_LOG0(__type, msg) \
-  __type ## _log("[%s:%u] " msg, m_host.c_str(), m_port)
+  __type ## _log("[%s:%u] " msg, getHost().c_str(), getPort())
 
-using namespace imtools;
-using namespace imtools::imserver;
+
+using imtools::ErrorException;
+using imtools::Command;
+using imtools::CommandFactory;
+
+using imtools::imserver::g_server;
+using imtools::imserver::Config;
+using imtools::imserver::Server;
+using imtools::imserver::ConfigPtrList;
+
 using boost::property_tree::ptree;
-using websocketpp::connection_hdl;
-using websocketpp::lib::placeholders::_1;
-using websocketpp::lib::placeholders::_2;
-using websocketpp::lib::bind;
 
-// Declare static members for linker
-Server::connection_list_type Server::s_connections;
-Server::instance_list_type Server::s_instances;
+
+static void
+wait_for_children()
+{
+  pid_t pid;
+  int status;
+
+  // Wait for all children
+  while ((pid = waitpid(-1, &status, WUNTRACED | WCONTINUED)) > 0) {
+    if (WIFEXITED(status)) {
+      verbose_log("Child process %ld exited, status=%d\n", (long) pid, WEXITSTATUS(status));
+    } else if (WIFSIGNALED(status)) {
+      verbose_log("Child process %ld killed by signal %d\n", (long) pid, WTERMSIG(status));
+    } else if (WIFSTOPPED(status)) {
+      verbose_log("Child process %ld stopped by signal %d\n", (long) pid, WSTOPSIG(status));
+    } else if (WIFCONTINUED(status)) {
+      verbose_log("Child process %ld continued\n", (long) pid);
+    }
+  }
+}
 
 
 static inline void
-_registerSignalHandler(struct sigaction& sa, int signal)
+stop()
+{
+  if (g_server) {
+    g_server->stop();
+  }
+  wait_for_children();
+}
+
+
+static void
+signal_handler(int signal, siginfo_t* siginfo, void*)
+{
+  verbose_log("Got signal '%d', PID: %ld, UID: %ld. Waiting for child processes.\n",
+      signal, (long) siginfo->si_pid, (long) siginfo->si_uid);
+  stop();
+}
+
+
+static inline void
+register_signal_handler(struct sigaction& sa, int signal)
 {
   if (sigaction(signal, &sa, NULL) < 0) {
     throw ErrorException("Failed to register signal %d: %s", signal, strerror(errno));
@@ -49,15 +97,17 @@ _registerSignalHandler(struct sigaction& sa, int signal)
 
 
 static inline void
-registerSignals()
+register_signals()
 {
-  verbose_log("Setting signal handlers\n");
+  debug_log0("Setting signal handlers\n");
+
   struct sigaction sa;
   memset(&sa, '\0', sizeof(sa));
-  sa.sa_sigaction = &Server::signalHandler;
+  sa.sa_sigaction = &signal_handler;
   sa.sa_flags = SA_SIGINFO | SA_NOCLDWAIT;
-  _registerSignalHandler(sa, SIGTERM);
-  _registerSignalHandler(sa, SIGINT);
+
+  register_signal_handler(sa, SIGTERM);
+  register_signal_handler(sa, SIGINT);
 }
 
 
@@ -65,7 +115,8 @@ registerSignals()
 static void
 usage(bool is_error)
 {
-  fprintf(is_error ? stdout : stderr, g_usage_template, g_program_name);
+  fprintf(is_error ? stdout : stderr,
+      imtools::imserver::g_usage_template, imtools::imserver::g_program_name);
 }
 
 
@@ -91,49 +142,24 @@ get_command(Command::Type type, const Command::element_vector_t& elements)
 }
 
 
-Server::~Server()
-{
-  try {
-    s_instances.erase(shared_from_this());
-  } catch (std::bad_weak_ptr e) {
-    // skip
-  }
-}
-
-
-Server::Server(uint16_t port, const std::string& host)
-: m_port(port), m_host(host)
-{
-}
-
-
-Server::ptr_type
-Server::create(uint16_t port, const std::string& host)
-{
-  ptr_type ps(new Server(port, host));
-  s_instances.insert(ps);
-  return ps;
-}
-
-
-Server::Option
-Server::getOption(const std::string& k)
+Config::Option
+Config::getOption(const std::string& k)
 {
   if (k.length() < 4) {
-    return Server::Option::UNKNOWN;
+    return Config::Option::UNKNOWN;
   }
 
-  Server::Option option;
+  Config::Option option;
 
   switch (k[0]) {
     case 'p':
-      option = k == "port" ? Server::Option::PORT : Server::Option::UNKNOWN;
+      option = k == "port" ? Config::Option::PORT : Config::Option::UNKNOWN;
       break;
     case 'h':
-      option = k == "host" ? Server::Option::HOST: Server::Option::UNKNOWN;
+      option = k == "host" ? Config::Option::HOST: Config::Option::UNKNOWN;
       break;
     default:
-      option = Server::Option::UNKNOWN;
+      option = Config::Option::UNKNOWN;
       break;
   }
 
@@ -141,14 +167,16 @@ Server::getOption(const std::string& k)
 }
 
 
-void
-Server::parseConfig(Server::ptr_list_type& server_list, const std::string& filename)
+ConfigPtrList
+Config::parse(const std::string& filename)
 {
   ptree pt;
+  ConfigPtrList list;
 
   try {
     verbose_log("Parsing configuration file '%s'\n", filename.c_str());
     boost::property_tree::ini_parser::read_ini(filename, pt);
+    list.reserve(pt.size());
 
     for (const auto& app_iter : pt) {
       std::string app_name = app_iter.first.data();
@@ -161,17 +189,17 @@ Server::parseConfig(Server::ptr_list_type& server_list, const std::string& filen
       for (const auto& cfg_iter : pt_cfg) {
         std::string k = cfg_iter.first.data();
         std::string v = cfg_iter.second.data();
-        Server::Option option = Server::getOption(k);
+        Config::Option option = Config::getOption(k);
         debug_log("k: %s v: %s o: %d\n", k.c_str(), v.c_str(), option);
 
         switch (option) {
-          case Server::Option::HOST:
+          case Config::Option::HOST:
             host = v;
             break;
-          case Server::Option::PORT:
+          case Config::Option::PORT:
             port = static_cast<uint16_t>(std::stoi(v));
             break;
-          case Server::Option::UNKNOWN: // no break
+          case Config::Option::UNKNOWN: // no break
           default:
             warning_log("Unknown option code: %d\n", option);
             break;
@@ -180,14 +208,7 @@ Server::parseConfig(Server::ptr_list_type& server_list, const std::string& filen
 
       if (port) {
         verbose_log("Adding server %s:%u\n", host.c_str(), port);
-        server_list.push_back(ptr_type(Server::create(port, host)));
-#ifndef IMTOOLS_THREADS
-        if (pt.size() > 1) {
-          warning_log("We are using only the first valid application, "
-              "since threading support is disabled in this build.\n");
-        }
-        break;
-#endif // ! IMTOOLS_THREADS
+        list.push_back(imtools::imserver::ConfigPtr(new Config(port, host)));
       } else {
         warning_log("No valid input values found for application '%s'. "
             "Skipping.\n", app_name.c_str());
@@ -199,6 +220,8 @@ Server::parseConfig(Server::ptr_list_type& server_list, const std::string& filen
     throw ErrorException("Unhandled error in configuration parser: %s. "
         "Please file a bug.", e.what());
   }
+
+  return list;
 }
 
 
@@ -215,7 +238,7 @@ Server::stop()
   }
 
   std::string reason;
-  for (auto& it : s_connections) {
+  for (auto& it : m_connections) {
     m_server.close(it, websocketpp::close::status::normal, reason, ec);
 
     if (ec) {
@@ -228,45 +251,17 @@ Server::stop()
 
 }
 
-void
-Server::stopAll()
-{
-  for (auto& it : Server::s_instances) {
-    // For safety, copy into shared_ptr before usage
-    if (auto shared_it = it.lock()) {
-      shared_it->stop();
-    }
-  }
-}
-
-
-void
-Server::signalHandler(int signal, siginfo_t* siginfo, void*)
-{
-  // Wait for all child processes
-  pid_t pid;
-  int status;
-
-  while ((pid = waitpid(-1, &status, 0)) > 0) {
-    if (WIFEXITED(status)) {
-      verbose_log("Child process exited, status=%d\n", WEXITSTATUS(status));
-    } else if (WIFSIGNALED(status)) {
-      verbose_log("Child process killed by signal %d\n", WTERMSIG(status));
-    } else {
-      verbose_log("Child process %ld exited\n", (long) pid);
-    }
-  }
-
-  verbose_log("Got signal '%d', PID: %ld, UID: %ld. Stopping server\n",
-      signal, (long)siginfo->si_pid, (long)siginfo->si_uid);
-  Server::stopAll();
-}
-
 
 void
 Server::run()
 {
+  using websocketpp::lib::placeholders::_1;
+  using websocketpp::lib::placeholders::_2;
+  using websocketpp::lib::bind;
+
   websocketpp::lib::error_code ec;
+  std::string host = getHost();
+  uint16_t port = getPort();
 
   m_server.set_open_handler(bind(&Server::onOpen, this, ::_1));
   m_server.set_close_handler(bind(&Server::onClose, this, ::_1));
@@ -278,10 +273,10 @@ Server::run()
     throw ErrorException(Server::getErrorMessage(ec));
   }
 
-  if (m_host == "") {
-    m_server.listen(boost::asio::ip::tcp::v4(), m_port);
+  if (host == "") {
+    m_server.listen(boost::asio::ip::tcp::v4(), port);
   } else {
-    m_server.listen(m_host, std::to_string(m_port));
+    m_server.listen(host, std::to_string(port));
   }
 
   IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Starting server's async connection acceptance\n");
@@ -290,14 +285,13 @@ Server::run()
     throw ErrorException(Server::getErrorMessage(ec));
   }
 
-
   IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Running I/O service loop\n");
   m_server.run();
 }
 
 
 const char*
-Server::getErrorMessage(const websocketpp::lib::error_code& ec)
+Server::getErrorMessage(const websocketpp::lib::error_code& ec) noexcept
 {
   std::stringstream ecs;
   ecs << ec << " (" << ec.message() << ")";
@@ -307,31 +301,31 @@ Server::getErrorMessage(const websocketpp::lib::error_code& ec)
 
 /// Unary operation for std::transform(). Converts property tree value to Command::element_t.
 Command::element_t
-Server::convertPtreeValue(const ptree::value_type& v)
+Server::convertPtreeValue(const ptree::value_type& v) noexcept
 {
   return Command::element_t(v.first.data(), v.second.data());
 }
 
 
 void
-Server::onOpen(connection_hdl hdl) const
+Server::onOpen(Connection conn) noexcept
 {
-  s_connections.insert(hdl);
+  m_connections.insert(conn);
 }
 
 
 void
-Server::onClose(connection_hdl hdl) const
+Server::onClose(Connection conn) noexcept
 {
-  s_connections.erase(hdl);
+  m_connections.erase(conn);
 }
 
 
 void
-Server::onMessage(connection_hdl hdl, websocket_server_type::message_ptr msg)
+Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
 {
   IMTOOLS_SERVER_OBJECT_LOG0(debug, "Message sent to default handler\n");
-  websocket_server_type::connection_ptr con = m_server.get_con_from_hdl(hdl);
+  WebSocketServer::connection_ptr con = m_server.get_con_from_hdl(conn);
 
   ptree pt;
   ptree pt_arg;
@@ -363,95 +357,35 @@ Server::onMessage(connection_hdl hdl, websocket_server_type::message_ptr msg)
 static void
 run(const std::string& config_filename)
 {
-  Server::ptr_list_type server_list;
-  Server::parseConfig(server_list, config_filename);
-  if (server_list.empty()) {
-    error_log("No servers found in configuration file '%s'\n", config_filename.c_str());
+  pid_t child_pid;
+  ConfigPtrList config_list = Config::parse(config_filename);
+
+  if (config_list.empty()) {
+    error_log("Configuration file is empty\n");
     exit(EXIT_FAILURE);
   }
 
-  registerSignals();
+  register_signals();
 
-#if 0
-  /*
-   * Threads are dangerous. It is also impossible to chroot() in a thread.
-   * So we'll rather fork.
-   */
-#ifdef IMTOOLS_THREADS
-  uint_t i;
-  uint_t n_servers = server_list.size();
-#ifdef USE_OPENMP
-  IT_INIT_OPENMP(imtools::max_threads());
-
-  _Pragma("omp parallel for")
-    for (i = 0; i < n_servers; ++i) {
-      Server::ptr_type server = server_list[i];
-      verbose_log("Started server %s:%u\n", server->getHost().c_str(), server->getPort());
-      server->run();
-    }
-#else // ! USE_OPENMP = use boost
-  boost::threadpool::pool thread_pool(imtools::max_threads());
-  boost::mutex mutex;
-
-  for (i = 0; i < n_servers; ++i) {
-    IT_SCOPED_LOCK(lock, mutex);
-    Server::ptr_type server = server_list[i];
-    thread_pool.schedule(boost::bind(&Server::run, server));
-  }
-
-  thread_pool.wait(); // Wait for threads to finish
-#endif // USE_OPENMP
-#else // no threads
-  Server::ptr_type server = server_list[0];
-  server->run();
-#endif // IMTOOLS_THREADS
-#endif
-
-  pid_t w_pid;
-  pid_t child_pid;
-  int status;
-  std::vector<pid_t> children_pid_list;
-
-  for (auto& server : server_list) {
+  for (auto& config : config_list) {
     child_pid = fork();
+
     if (child_pid == -1) {
       error_log("Failed to fork()\n");
       _exit(EXIT_FAILURE);
     }
 
     if (child_pid == 0) { // child process
-      server->run();
+      g_server = imtools::imserver::ServerPtr(new Server(config));
+      g_server->run();
       _exit(EXIT_SUCCESS);
     }
 
     verbose_log("Forked child, PID: %ld\n", static_cast<long>(child_pid));
-    children_pid_list.push_back(child_pid);
   }
 
   // The following goes within parent process
-
-
-  // Wait for children
-  for (const auto& pid: children_pid_list) {
-    do {
-      debug_log("Waiting for child process %ld\n", (long) pid);
-      w_pid = waitpid(pid, &status, WUNTRACED | WCONTINUED);
-      if (w_pid == -1) {
-        error_log("Failed to wait for child processes %ld\n", (long) pid);
-        exit(EXIT_FAILURE);
-      }
-
-      if (WIFEXITED(status)) {
-        verbose_log("Child process %ld exited, status=%d\n", (long) pid, WEXITSTATUS(status));
-      } else if (WIFSIGNALED(status)) {
-        verbose_log("Child process %ld killed by signal %d\n", (long) pid, WTERMSIG(status));
-      } else if (WIFSTOPPED(status)) {
-        verbose_log("Child process %ld stopped by signal %d\n", (long) pid, WSTOPSIG(status));
-      } else if (WIFCONTINUED(status)) {
-        verbose_log("Child process %ld continued\n", (long) pid);
-      }
-    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-  }
+  stop();
 }
 
 
@@ -461,7 +395,7 @@ main(int argc, char **argv)
   int next_option;
   int exit_code   = 0;
 
-  g_program_name = argv[0];
+  imtools::imserver::g_program_name = argv[0];
 
   std::string config_filename;
 
@@ -472,7 +406,9 @@ main(int argc, char **argv)
   debug_log0("Parsing CLI args\n");
   try {
     do {
-      next_option = getopt_long(argc, argv, g_short_options, g_long_options, NULL);
+      next_option = getopt_long(argc, argv,
+          imtools::imserver::g_short_options,
+          imtools::imserver::g_long_options, NULL);
 
       switch (next_option) {
         case 'h':
@@ -480,11 +416,11 @@ main(int argc, char **argv)
           exit(0);
 
         case 'v':
-          verbose++;
+          imtools::verbose++;
           break;
 
         case 'V':
-          print_version();
+          imtools::print_version();
           exit(0);
 
         case 'c':

@@ -13,15 +13,19 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+#pragma once
 #ifndef IMTOOLS_IMRESIZE_API_HXX
 #define IMTOOLS_IMRESIZE_API_HXX
+
+#include <string>
+#include "imtools-types.hxx"
 #include "Command.hxx"
 
 namespace imtools { namespace imresize {
 
-using namespace imtools;
 using imtools::Command;
 
+/////////////////////////////////////////////////////////////////////
 class ResizeCommand : public ::imtools::Command
 {
   public:
@@ -38,23 +42,23 @@ class ResizeCommand : public ::imtools::Command
 
     ResizeCommand(const std::string& source,
         const std::string& output,
-        uint_t width = 0,
-        uint_t height = 0,
-        double fx = 0.,
-        double fy = 0.,
-        int interpolation = cv::INTER_LINEAR);
+        uint_t width,
+        uint_t height,
+        double fx,
+        double fy,
+        int interpolation) noexcept;
 
-    ResizeCommand(const element_vector_t& elements);
+    ResizeCommand(const element_vector_t& elements) noexcept;
 
-    ResizeCommand() {}
+    ResizeCommand() = delete;
     virtual ~ResizeCommand() {}
-    ResizeCommand(ResizeCommand const&) {}
+    ResizeCommand(ResizeCommand const&) = delete;
 
     // Executes the command
     virtual void run() const;
 
     /// Returns numeric representation of option name for comparisions.
-    virtual int getOptionCode(const std::string& o) const;
+    virtual int getOptionCode(const std::string& o) const noexcept;
 
   protected:
     /// Source image path
@@ -74,6 +78,7 @@ class ResizeCommand : public ::imtools::Command
 };
 
 
+/////////////////////////////////////////////////////////////////////
 class ResizeCommandFactory : public ::imtools::CommandFactory
 {
   public:
@@ -87,7 +92,7 @@ class ResizeCommandFactory : public ::imtools::CommandFactory
     }
 };
 
-
+/////////////////////////////////////////////////////////////////////
 }} // namespace imtools::imresize
 #endif // IMTOOLS_IMRESIZE_API_HXX
 // vim: et ts=2 sts=2 sw=2

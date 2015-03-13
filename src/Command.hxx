@@ -13,13 +13,16 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+#pragma once
 #ifndef IMTOOLS_COMMAND_HXX
 #define IMTOOLS_COMMAND_HXX
+
+#include <iosfwd>
 #include <utility> // for std::pair
-#include "imtools.hxx"
+#include <vector>
 
 namespace imtools {
-
+/////////////////////////////////////////////////////////////////////
 /// Base class for API command classes
 class Command
 {
@@ -44,33 +47,7 @@ class Command
     virtual int getOptionCode(const std::string& o) const = 0;
 
     /// Returns numeric representation of command name for comparisions.
-    static Type getType(const std::string& c)
-    {
-      if (c.length() < 3) {
-        return Type::UNKNOWN;
-      }
-
-      Command::Type code;
-
-      switch (c[2]) {
-        case 'r':
-          code = c == "imresize" ? Type::RESIZE : Type::UNKNOWN;
-          break;
-        case 'm':
-          code = c == "immerge"  ? Type::MERGE  : Type::UNKNOWN;
-          break;
-        default:
-          code = Type::UNKNOWN;
-          break;
-      }
-
-      return code;
-    }
-
-    static void setCompressionParams(const compression_params_t& params)
-    {
-      s_compression_params = params;
-    }
+    static Type getType(const std::string& c);
 
     static const compression_params_t getCompressionParams()
     {
@@ -82,7 +59,7 @@ class Command
     static compression_params_t s_compression_params;
 };
 
-
+/////////////////////////////////////////////////////////////////////
 class CommandFactory
 {
   public:
@@ -91,6 +68,7 @@ class CommandFactory
 };
 
 
+/////////////////////////////////////////////////////////////////////
 } // namespace imtools
 #endif // IMTOOLS_COMMAND_HXX
 // vim: et ts=2 sts=2 sw=2

@@ -1,4 +1,7 @@
-/* Copyright © 2014,2015 - Ruslan Osmanov <rrosmanov@gmail.com>
+
+/* \file
+ *
+ * \copyright Copyright © 2014,2015  Ruslan Osmanov <rrosmanov@gmail.com>
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -13,37 +16,15 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+#ifndef IMTOOLS_OPENCV_FWD_HXXX
+#define IMTOOLS_OPENCV_FWD_HXXX
 
-#include <string>
-#include "imtools-types.hxx"
-#include "Command.hxx"
-
-using imtools::Command;
-
-Command::compression_params_t Command::s_compression_params;
-
-Command::Type
-Command::getType(const std::string& c)
-{
-  if (c.length() < 3) {
-    return Type::UNKNOWN;
-  }
-
-  Command::Type code;
-
-  switch (c[2]) {
-    case 'r':
-      code = c == "imresize" ? Command::Type::RESIZE : Command::Type::UNKNOWN;
-      break;
-    case 'm':
-      code = c == "immerge"  ? Command::Type::MERGE  : Command::Type::UNKNOWN;
-      break;
-    default:
-      code = Command::Type::UNKNOWN;
-      break;
-  }
-
-  return code;
+namespace cv {
+class Mat;
+template<typename T> class Rect_;
+typedef Rect_<int> Rect;
 }
 
+//#include "opencv2/highgui/highgui.hpp"
+#endif // IMTOOLS_OPENCV_FWD_HXX
 // vim: et ts=2 sts=2 sw=2

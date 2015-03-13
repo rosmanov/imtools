@@ -13,8 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+#pragma once
 #ifndef IMTOOLS_IMRESIZE_HXX
 #define IMTOOLS_IMRESIZE_HXX
+#include <getopt.h>
 #include "imtools.hxx"
 #include "imresize-api.hxx"
 
@@ -36,7 +38,7 @@ double g_fx = 0.;
 /// Scale factor along the vertical axis.
 double g_fy = 0.;
 /// Interpolation method
-int g_interpolation = cv::INTER_LINEAR;
+int g_interpolation = 0;
 
 
 /// Template for `printf`-like function.

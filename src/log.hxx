@@ -13,18 +13,24 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
-
+#pragma once
 #ifndef IMTOOLS_LOG_HXX
 #define IMTOOLS_LOG_HXX
 
-#include "imtools.hxx"
-#include <iostream>
+#include <stdio.h>
+#include <cstdarg>
+#include <string>
+#include <vector>
 
-using std::vector;
-using std::string;
+#include "imtools-types.hxx"
+#include "threads.hxx"
 
-namespace imtools { namespace log
-{
+namespace imtools {
+extern uint_t verbose;
+}
+
+namespace imtools { namespace log {
+/////////////////////////////////////////////////////////////////////
 
 #ifdef IMTOOLS_THREADS
 # define IMTOOLS_THREAD_ID imtools::threads::get_id()
@@ -36,14 +42,13 @@ namespace imtools { namespace log
 # define debug_log0(__str)                                                \
   do {                                                                    \
     IT_IO_SCOPED_LOCK(__scoped_lock);                                     \
-    std::cout << "[Debug] [" << IMTOOLS_THREAD_ID << "] " __str; \
+    printf("[Debug] [%ld] " __str, static_cast<long>(IMTOOLS_THREAD_ID)); \
   } while (0)
 
 # define debug_log(__fmt, ...)                                      \
   do {                                                              \
     IT_IO_SCOPED_LOCK(__scoped_lock);                               \
-    std::cout << "[Debug] [" << IMTOOLS_THREAD_ID << "] "; \
-    printf(__fmt, __VA_ARGS__) ;                                    \
+    printf("[Debug] [%ld] " __fmt, static_cast<long>(IMTOOLS_THREAD_ID), __VA_ARGS__); \
   } while (0)
 #else
 # define debug_log0(__str)
@@ -104,12 +109,14 @@ namespace imtools { namespace log
 # define debug_timer_end(__t1, __t2, __name)
 #endif
 
+/////////////////////////////////////////////////////////////////////
 
-typedef vector<string> errors_t;
+typedef std::vector<std::string> errors_t;
 extern errors_t error_stack;
 
+/////////////////////////////////////////////////////////////////////
 
-inline void push_error(string& msg)
+inline void push_error(const std::string& msg)
 {
   error_stack.push_back(msg);
 }
@@ -127,11 +134,7 @@ inline void warn_all()
     error_stack.clear();
   }
 }
-
-} // namespace log
-
-} // namespace imtools
-
+/////////////////////////////////////////////////////////////////////
+}} // namespace imtools::log
 #endif // IMTOOLS_LOG_HXX
-
 // vim: et ts=2 sts=2 sw=2

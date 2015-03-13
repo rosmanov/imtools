@@ -1,3 +1,4 @@
+#pragma once
 #ifndef IMTOOLS_OMP_GUARD_HXX
 #define IMTOOLS_OMP_GUARD_HXX
 
@@ -21,6 +22,5 @@ class OmpGuard
 };
 
 }} // namespace imtools::threads
-
 #endif // IMTOOLS_OMP_GUARD_HXX
 // vim: et ts=2 sts=2 sw=2
