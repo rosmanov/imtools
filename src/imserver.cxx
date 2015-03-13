@@ -17,6 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+// XXX  Make per-process instances of Server, don't keep list of servers (at
+// least in children).
 #include "imserver.hxx"
 
 #define IMTOOLS_SERVER_OBJECT_LOG(__type, fmt, ...) \
@@ -53,7 +55,7 @@ registerSignals()
   struct sigaction sa;
   memset(&sa, '\0', sizeof(sa));
   sa.sa_sigaction = &Server::signalHandler;
-  sa.sa_flags = SA_SIGINFO;
+  sa.sa_flags = SA_SIGINFO | SA_NOCLDWAIT;
   _registerSignalHandler(sa, SIGTERM);
   _registerSignalHandler(sa, SIGINT);
 }
@@ -102,17 +104,6 @@ Server::~Server()
 Server::Server(uint16_t port, const std::string& host)
 : m_port(port), m_host(host)
 {
-  websocketpp::lib::error_code ec;
-
-  m_server.init_asio(ec);
-  if (ec) {
-    throw ErrorException(Server::getErrorMessage(ec));
-  }
-
-  m_server.set_reuse_addr(true);
-  m_server.set_open_handler(bind(&Server::onOpen, this, ::_1));
-  m_server.set_close_handler(bind(&Server::onClose, this, ::_1));
-  m_server.set_message_handler(bind(&Server::onMessage, this, ::_1, ::_2));
 }
 
 
@@ -216,12 +207,13 @@ Server::stop()
 {
   websocketpp::lib::error_code ec;
 
+  IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Closing connections\n");
+
   m_server.stop_listening(ec);
   if (ec) {
     IMTOOLS_SERVER_OBJECT_LOG(error, "Failed to stop listening: %s\n", Server::getErrorMessage(ec));
   }
 
-  IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Closing connections");
   std::string reason;
   for (auto& it : s_connections) {
     m_server.close(it, websocketpp::close::status::normal, reason, ec);
@@ -233,15 +225,12 @@ Server::stop()
   if (!ec) {
     IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Connections closed successfully\n");
   }
+
 }
 
-
 void
-Server::signalHandler(int signal, siginfo_t* siginfo, void*)
+Server::stopAll()
 {
-  verbose_log("Got signal '%d', PID: %ld, UID: %ld. Stopping server\n",
-      signal, (long)siginfo->si_pid, (long)siginfo->si_uid);
-
   for (auto& it : Server::s_instances) {
     // For safety, copy into shared_ptr before usage
     if (auto shared_it = it.lock()) {
@@ -252,9 +241,42 @@ Server::signalHandler(int signal, siginfo_t* siginfo, void*)
 
 
 void
+Server::signalHandler(int signal, siginfo_t* siginfo, void*)
+{
+  // Wait for all child processes
+  pid_t pid;
+  int status;
+
+  while ((pid = waitpid(-1, &status, 0)) > 0) {
+    if (WIFEXITED(status)) {
+      verbose_log("Child process exited, status=%d\n", WEXITSTATUS(status));
+    } else if (WIFSIGNALED(status)) {
+      verbose_log("Child process killed by signal %d\n", WTERMSIG(status));
+    } else {
+      verbose_log("Child process %ld exited\n", (long) pid);
+    }
+  }
+
+  verbose_log("Got signal '%d', PID: %ld, UID: %ld. Stopping server\n",
+      signal, (long)siginfo->si_pid, (long)siginfo->si_uid);
+  Server::stopAll();
+}
+
+
+void
 Server::run()
 {
   websocketpp::lib::error_code ec;
+
+  m_server.set_open_handler(bind(&Server::onOpen, this, ::_1));
+  m_server.set_close_handler(bind(&Server::onClose, this, ::_1));
+  m_server.set_message_handler(bind(&Server::onMessage, this, ::_1, ::_2));
+  m_server.set_reuse_addr(true);
+
+  m_server.init_asio(ec);
+  if (ec) {
+    throw ErrorException(Server::getErrorMessage(ec));
+  }
 
   if (m_host == "") {
     m_server.listen(boost::asio::ip::tcp::v4(), m_port);
@@ -267,6 +289,7 @@ Server::run()
   if (ec) {
     throw ErrorException(Server::getErrorMessage(ec));
   }
+
 
   IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Running I/O service loop\n");
   m_server.run();
@@ -344,9 +367,16 @@ run(const std::string& config_filename)
   Server::parseConfig(server_list, config_filename);
   if (server_list.empty()) {
     error_log("No servers found in configuration file '%s'\n", config_filename.c_str());
-    exit(2);
+    exit(EXIT_FAILURE);
   }
 
+  registerSignals();
+
+#if 0
+  /*
+   * Threads are dangerous. It is also impossible to chroot() in a thread.
+   * So we'll rather fork.
+   */
 #ifdef IMTOOLS_THREADS
   uint_t i;
   uint_t n_servers = server_list.size();
@@ -375,6 +405,53 @@ run(const std::string& config_filename)
   Server::ptr_type server = server_list[0];
   server->run();
 #endif // IMTOOLS_THREADS
+#endif
+
+  pid_t w_pid;
+  pid_t child_pid;
+  int status;
+  std::vector<pid_t> children_pid_list;
+
+  for (auto& server : server_list) {
+    child_pid = fork();
+    if (child_pid == -1) {
+      error_log("Failed to fork()\n");
+      _exit(EXIT_FAILURE);
+    }
+
+    if (child_pid == 0) { // child process
+      server->run();
+      _exit(EXIT_SUCCESS);
+    }
+
+    verbose_log("Forked child, PID: %ld\n", static_cast<long>(child_pid));
+    children_pid_list.push_back(child_pid);
+  }
+
+  // The following goes within parent process
+
+
+  // Wait for children
+  for (const auto& pid: children_pid_list) {
+    do {
+      debug_log("Waiting for child process %ld\n", (long) pid);
+      w_pid = waitpid(pid, &status, WUNTRACED | WCONTINUED);
+      if (w_pid == -1) {
+        error_log("Failed to wait for child processes %ld\n", (long) pid);
+        exit(EXIT_FAILURE);
+      }
+
+      if (WIFEXITED(status)) {
+        verbose_log("Child process %ld exited, status=%d\n", (long) pid, WEXITSTATUS(status));
+      } else if (WIFSIGNALED(status)) {
+        verbose_log("Child process %ld killed by signal %d\n", (long) pid, WTERMSIG(status));
+      } else if (WIFSTOPPED(status)) {
+        verbose_log("Child process %ld stopped by signal %d\n", (long) pid, WSTOPSIG(status));
+      } else if (WIFCONTINUED(status)) {
+        verbose_log("Child process %ld continued\n", (long) pid);
+      }
+    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+  }
 }
 
 
@@ -384,9 +461,9 @@ main(int argc, char **argv)
   int next_option;
   int exit_code   = 0;
 
-  std::string config_filename;
-
   g_program_name = argv[0];
+
+  std::string config_filename;
 
 #ifdef IMTOOLS_DEBUG
   setvbuf(stdout, NULL, _IONBF, 0); // turn off buffering
@@ -449,7 +526,6 @@ main(int argc, char **argv)
 #endif
 
   try {
-    registerSignals();
     run(config_filename);
   } catch (ErrorException& e) {
     error_log("%s\n", e.what());

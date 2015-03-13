@@ -16,11 +16,12 @@
 #ifndef IMTOOLS_IMSERVER_HXX
 #define IMTOOLS_IMSERVER_HXX
 
+#include <sys/wait.h>
+#include <signal.h> // for sigaction()
 #include <set>
 #include <memory> // for std::unique_ptr(), std::weak_ptr()
 #include <iterator> // for std::back_inserter()
 #include <algorithm> // for std::transform()
-#include <signal.h> // for sigaction()
 
 // Boost parsers
 #include <boost/property_tree/ptree.hpp>
@@ -48,10 +49,6 @@ using websocketpp::lib::error_code;
 typedef websocketpp::server<websocketpp::config::asio> websocket_server_type;
 
 const char* g_program_name;
-
-#ifdef IMTOOLS_THREADS
-unsigned g_max_threads = 4;
-#endif
 
 /// Template for `printf`-like function.
 const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
@@ -119,6 +116,7 @@ class Server : public std::enable_shared_from_this<Server>
     virtual void onMessage(connection_hdl hdl, websocket_server_type::message_ptr msg);
 
     static void parseConfig(ptr_list_type& server_list, const std::string& filename);
+    static void stopAll();
 
     inline uint16_t getPort() const { return m_port; }
     inline const std::string& getHost() const { return m_host; }
