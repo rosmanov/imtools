@@ -24,10 +24,8 @@ As a result, `bin` directory will contain the binaries.
 
 ### Gentoo
 
-```text
-# layman -f -o https://bitbucket.org/osmanov/gentoo-overlay/raw/master/repository.xml -a osmanov-overlay
-# emerge -va media-gfx/imtools
-```
+    # layman -f -o https://bitbucket.org/osmanov/gentoo-overlay/raw/master/repository.xml -a osmanov-overlay
+    # emerge -va media-gfx/imtools
 
 ## Main tools
 
@@ -47,28 +45,71 @@ Thumbnail maker.
 WebSocket server which can be used for real-time image processing on a Web site.
 
 *Sample configuration*
-```
-[application_1]
-port=9909
-host=127.0.0.10
 
-[application_N]
-port=9910
-#host=
-...
-```
+    # [application_example]
+    # Port on which to accept WebSocket requests.
+    # port=9902
+    #
+    # Hostname or IP address on which to accept WebSocket requests.
+    # Empty means all addresses.
+    # host=
+    #
+    # Change to this directory at the start (for relative paths).
+    # chdir=
+    #
+    # Whether to allow absolute paths.
+    # allow_absolute_paths=false
+
+    [application_1]
+    port=9809
+    chdir=/home/ruslan/projects/imtools/bin
+    allow_absolute_paths=false
+
+    [application_N]
+    port=9810
+    host=127.0.0.10
+    ...
+
+*Request format for `imresize` command*
+
+    {
+      "command" : "imresize",
+      "arguments" : { argument properties ... }
+      }
+    }
+
+
+_Arguments_:
+- `source` - source image path, e.g. `"/path/to/source/image.png"`
+- `output` - output image path, e.g. `"/path/to/output/image.png"`
+- `width` - width of thumbnail, e.g. 120
+- `height` - height of thumbnail, e.g. 120
+- `fx` - scale factor for horizontal axis, e.g.: 0.5
+- `fy` - scale factor for vertical axis, e.g.: 0.5
+- `interpolation` - Interpolation method (_see output of_ `imresize --help` _command_)
+
+*Request example: make 50%-thumbnail from source.png and save it to thumbnail.png*
+
+    {
+      "command" : "imresize",
+      "arguments" : {
+        "source" : "source.png",
+        "output" : "thumbnail.png",
+        "fx" : 0.5,
+        "fy" : 0.5
+      }
+    }
 
 [Nginx](http://nginx.org) configuration:
-```nginx
-location /websocket {
-  proxy_pass http://backend;
-  proxy_http_version 1.1;
-  proxy_set_header Upgrade $http_upgrade;
-  proxy_set_header Connection "upgrade";
-  proxy_read_timeout 3600; # 60-minute timeout for reads
-  proxy_send_timeout 3600; # 60-minute timeout for writes
-}
-```
+
+    location /websocket {
+      proxy_pass http://backend;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_read_timeout 3600; # 60-minute timeout for reads
+      proxy_send_timeout 3600; # 60-minute timeout for writes
+    }
 
 ## Extra tools
 

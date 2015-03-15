@@ -31,11 +31,7 @@
 
 
 #ifdef IMTOOLS_THREADS
-# ifdef USE_OPENMP
-#  define IMTOOLS_THREADS_BACKEND "OpenMP"
-# else
-#  define IMTOOLS_THREADS_BACKEND "Boost"
-# endif
+# define IMTOOLS_THREADS_BACKEND "OpenMP"
 # define IMTOOLS_SUFFIX "threaded" "(" IMTOOLS_THREADS_BACKEND ")"
 #else
 # define IMTOOLS_SUFFIX "non-threaded"

@@ -17,7 +17,6 @@
 #ifndef IMTOOLS_IMSERVER_HXX
 #define IMTOOLS_IMSERVER_HXX
 
-
 #include <getopt.h>
 #include <string>
 #include <memory>
@@ -29,6 +28,7 @@
 
 #include "imresize-api.hxx"
 #include "imtools-meta.hxx"
+
 
 namespace imtools { namespace imserver {
 /////////////////////////////////////////////////////////////////////
@@ -45,6 +45,8 @@ typedef websocketpp::server<websocketpp::config::asio> WebSocketServer;
 /////////////////////////////////////////////////////////////////////
 
 const char* g_program_name;
+/// Pointer to the currently running WebSocket server endpoint.
+/// (Since we fork(), we need only one variable.)
 ServerPtr g_server;
 
 /// Template for `printf`-like function.
@@ -70,16 +72,26 @@ const struct option g_long_options[] = {
   {0,         0,                 0,    0}
 };
 
+
+
 /////////////////////////////////////////////////////////////////////
 /// Server configuration for an application
 class Config : public std::enable_shared_from_this<Config>
 {
   public:
+    /// Numeric representation of configuration option names.
     enum class Option
     {
+      /// Unhandled option type
       UNKNOWN,
+      /// for `port`
       PORT,
-      HOST
+      /// for `host`
+      HOST,
+      /// for `chdir`
+      CHDIR,
+      /// for `allow_absolute_paths`
+      ALLOW_ABSOLUTE_PATHS
     };
 
     Config() = delete;
@@ -87,27 +99,52 @@ class Config : public std::enable_shared_from_this<Config>
     Config& operator=(const Config&) = delete;
 
     virtual ~Config() {}
-    explicit Config(uint16_t port, const std::string& host)
-      : m_port(port), m_host(host) {}
+    explicit Config(uint16_t port,
+        const std::string& host,
+        const std::string& chdir_dir,
+        bool allow_absolute_paths)
+      : m_port(port),
+        m_host(host),
+        m_chdir(chdir_dir),
+        m_allow_absolute_paths(allow_absolute_paths) {}
 
+    /// Parses a configuration file
+    /// \param filename Path to configuration file
+    /// \returns a set of configuration instances.
     static ConfigPtrList parse(const std::string& filename);
 
-    inline uint16_t getPort() const { return m_port; }
-    inline const std::string& getHost() const { return m_host; }
+    inline uint16_t getPort() const noexcept { return m_port; }
+    inline const std::string& getHost() const noexcept { return m_host; }
+    inline const std::string& getChdirDir() const noexcept { return m_chdir; }
+    inline bool getAllowAbsolutePaths() const noexcept { return m_allow_absolute_paths; }
 
   protected:
+    /// \param k Option name
+    /// \returns Numeric representation of option name
     static Option getOption(const std::string& k);
 
+    /// Value of 'port' configuration option.
     uint16_t m_port;
+    /// Value of 'host' configuration option.
     std::string m_host;
+    /// Value of 'chdir' configuration option.
+    std::string m_chdir;
+    /// Value of 'allow_absolute_paths' configuration option.
+    bool m_allow_absolute_paths;
 };
 
 
 /////////////////////////////////////////////////////////////////////
-/// Application server
+/// WebSocket server for an application (section in the config file)
 class Server : public std::enable_shared_from_this<Server>
 {
   public:
+    enum class MessageType
+    {
+      ERROR,
+      SUCCESS
+    };
+
     virtual ~Server() {}
     explicit Server(const ConfigPtr& config) noexcept : m_config(config) {}
 
@@ -115,24 +152,42 @@ class Server : public std::enable_shared_from_this<Server>
     Server(const Server&) = delete;
     Server& operator=(const Server&) = delete;
 
+    /// Starts accepting connections
     virtual void run();
+    /// Stops accepting connections, closes all active connections
     virtual void stop();
 
+    /// Callback which is invoked when a new connection is opened.
     virtual void onOpen(Connection conn) noexcept;
+    /// Callback which is invoked when a connection is closed.
     virtual void onClose(Connection conn) noexcept;
+    /// Callback which is invoked when connection receives a request from the client.
     virtual void onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept;
 
+    /// Returns port on which the server accepts WebSocket requests.
     inline uint16_t getPort() const noexcept { return m_config->getPort(); }
+    /// Returns hostname on which the server accepts WebSocket requests. Empty means 'all hosts'
     inline const std::string& getHost() const noexcept { return m_config->getHost(); }
+    /// Returns value of 'chdir' configuration option.
+    inline const std::string& getChdirDir() const noexcept { return m_config->getChdirDir(); }
+    /// Returns value of 'allow_absolute_paths' configuration option.
+    inline bool getAllowAbsolutePaths() const noexcept { return m_config->getAllowAbsolutePaths(); }
 
   protected:
     typedef std::set<Connection, std::owner_less<Connection>> ConnectionList;
 
     static const char* getErrorMessage(const websocketpp::lib::error_code& ec) noexcept;
+    /// Unary operation for std::transform(). Converts property tree value to Command::element_t.
     static Command::element_t convertPtreeValue(const boost::property_tree::ptree::value_type& v) noexcept;
 
+    /// Sends response message to the client.
+    virtual void sendMessage(Connection conn, const std::string& message, MessageType type) noexcept;
+
+    /// Configuration of an application
     ConfigPtr m_config;
+    /// WebSocket endpoint
     WebSocketServer m_server;
+    /// Container for accepted connections.
     ConnectionList m_connections;
 };
 

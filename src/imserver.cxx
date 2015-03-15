@@ -20,6 +20,7 @@
 
 #include "imserver.hxx"
 
+#include <sstream>
 #include <signal.h>
 #include <sys/wait.h>
 #include <algorithm> // for std::transform()
@@ -69,7 +70,7 @@ wait_for_children()
 
 
 static inline void
-stop()
+stop() noexcept
 {
   if (g_server) {
     g_server->stop();
@@ -156,7 +157,13 @@ Config::getOption(const std::string& k)
       option = k == "port" ? Config::Option::PORT : Config::Option::UNKNOWN;
       break;
     case 'h':
-      option = k == "host" ? Config::Option::HOST: Config::Option::UNKNOWN;
+      option = k == "host" ? Config::Option::HOST : Config::Option::UNKNOWN;
+      break;
+    case 'c':
+      option = k == "chdir" ? Config::Option::CHDIR : Config::Option::UNKNOWN;
+      break;
+    case 'a':
+      option = k == "allow_absolute_paths" ? Config::Option::ALLOW_ABSOLUTE_PATHS : Config::Option::UNKNOWN;
       break;
     default:
       option = Config::Option::UNKNOWN;
@@ -185,6 +192,8 @@ Config::parse(const std::string& filename)
       ptree pt_cfg = app_iter.second;
       uint16_t port = 9902;
       std::string host;
+      bool allow_absolute_paths = false;
+      std::string chdir_dir;
 
       for (const auto& cfg_iter : pt_cfg) {
         std::string k = cfg_iter.first.data();
@@ -199,6 +208,12 @@ Config::parse(const std::string& filename)
           case Config::Option::PORT:
             port = static_cast<uint16_t>(std::stoi(v));
             break;
+          case Config::Option::CHDIR:
+            chdir_dir = v;
+            break;
+          case Config::Option::ALLOW_ABSOLUTE_PATHS:
+            allow_absolute_paths = (v == "true");
+            break;
           case Config::Option::UNKNOWN: // no break
           default:
             warning_log("Unknown option code: %d\n", option);
@@ -208,7 +223,8 @@ Config::parse(const std::string& filename)
 
       if (port) {
         verbose_log("Adding server %s:%u\n", host.c_str(), port);
-        list.push_back(imtools::imserver::ConfigPtr(new Config(port, host)));
+        list.push_back(imtools::imserver::ConfigPtr(new Config(port, host,
+                chdir_dir, allow_absolute_paths)));
       } else {
         warning_log("No valid input values found for application '%s'. "
             "Skipping.\n", app_name.c_str());
@@ -248,62 +264,34 @@ Server::stop()
   if (!ec) {
     IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Connections closed successfully\n");
   }
-
 }
 
 
 void
-Server::run()
+Server::sendMessage(Connection conn, const std::string& message, MessageType type) noexcept
 {
-  using websocketpp::lib::placeholders::_1;
-  using websocketpp::lib::placeholders::_2;
-  using websocketpp::lib::bind;
+  ptree pt;
 
-  websocketpp::lib::error_code ec;
-  std::string host = getHost();
-  uint16_t port = getPort();
+  try {
+    std::stringstream json_stream;
+    websocketpp::lib::error_code ec;
 
-  m_server.set_open_handler(bind(&Server::onOpen, this, ::_1));
-  m_server.set_close_handler(bind(&Server::onClose, this, ::_1));
-  m_server.set_message_handler(bind(&Server::onMessage, this, ::_1, ::_2));
-  m_server.set_reuse_addr(true);
+    // Generate JSON: {"error" : (int), "response" : "(string)"}
+    pt.put("error", (int) (type == Server::MessageType::ERROR));
+    pt.put("response", message);
+    boost::property_tree::json_parser::write_json(json_stream, pt);
 
-  m_server.init_asio(ec);
-  if (ec) {
-    throw ErrorException(Server::getErrorMessage(ec));
+    m_server.send(conn, json_stream.str(), websocketpp::frame::opcode::text, ec);
+    if (ec) {
+      error_log("Fatal error in %s: %s\n", __func__, Server::getErrorMessage(ec));
+    }
+  } catch (boost::property_tree::ptree_bad_data& e) {
+    error_log("Failed to generate JSON: %s\n", e.what());
+  } catch (std::exception& e) {
+    error_log("Fatal error: %s\n", e.what());
+  } catch (...) {
+    error_log("Unknown error in %s. File a bug\n", __func__);
   }
-
-  if (host == "") {
-    m_server.listen(boost::asio::ip::tcp::v4(), port);
-  } else {
-    m_server.listen(host, std::to_string(port));
-  }
-
-  IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Starting server's async connection acceptance\n");
-  m_server.start_accept(ec);
-  if (ec) {
-    throw ErrorException(Server::getErrorMessage(ec));
-  }
-
-  IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Running I/O service loop\n");
-  m_server.run();
-}
-
-
-const char*
-Server::getErrorMessage(const websocketpp::lib::error_code& ec) noexcept
-{
-  std::stringstream ecs;
-  ecs << ec << " (" << ec.message() << ")";
-  return (ecs.str()).c_str();
-}
-
-
-/// Unary operation for std::transform(). Converts property tree value to Command::element_t.
-Command::element_t
-Server::convertPtreeValue(const ptree::value_type& v) noexcept
-{
-  return Command::element_t(v.first.data(), v.second.data());
 }
 
 
@@ -330,6 +318,7 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
   ptree pt;
   ptree pt_arg;
   std::stringstream ss(msg->get_payload());
+  std::string error;
 
   try {
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Parsing JSON: %s\n", ss.str().c_str());
@@ -342,16 +331,90 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
 
     auto command_name = pt.get<std::string>("command");
     auto command_ptr = get_command(Command::getType(command_name), elements);
+
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Running command: '%s'\n", command_name.c_str());
+    command_ptr->setAllowAbsolutePaths(getAllowAbsolutePaths());
     command_ptr->run();
   } catch (boost::property_tree::json_parser_error& e) {
+    error = std::string("Invalid JSON: ") + e.what();
     error_log("Failed to parse json: %s, input: %s\n", e.what(), ss.str().c_str());
   } catch (ErrorException& e) {
-    error_log("Fatal error: %s\n", e.what());
+    error = std::string("Fatal error: ") + e.what();
+    error_log("%s\n", error.c_str());
   } catch (...) {
+    error = "Internal Server Error";
     error_log("Unknown error in '%s'!!! Please file a bug.\n", __func__);
   }
+
+  if (!error.empty()) {
+    debug_log("sending error message: %s\n", error.c_str());
+    sendMessage(conn, error, Server::MessageType::ERROR);
+  }
 }
+
+
+void
+Server::run()
+{
+  using websocketpp::lib::placeholders::_1;
+  using websocketpp::lib::placeholders::_2;
+  using websocketpp::lib::bind;
+
+  websocketpp::lib::error_code ec;
+  uint16_t port = getPort();
+  std::string host(getHost());
+
+  m_server.set_open_handler(bind(&Server::onOpen, this, ::_1));
+  m_server.set_close_handler(bind(&Server::onClose, this, ::_1));
+  m_server.set_message_handler(bind(&Server::onMessage, this, ::_1, ::_2));
+  m_server.set_reuse_addr(true);
+
+  m_server.init_asio(ec);
+  if (ec) {
+    throw ErrorException(Server::getErrorMessage(ec));
+  }
+
+  std::string chdir_dir(getChdirDir());
+  if (!chdir_dir.empty()) {
+    IMTOOLS_SERVER_OBJECT_LOG(debug, "chdir(%s)\n", chdir_dir.c_str());
+    if (chdir(chdir_dir.c_str()) != 0) {
+      throw ErrorException("chdir() failed: %s", strerror(errno));
+    }
+  }
+
+  if (host == "") {
+    // XXX detect whether IPv6 is available
+    m_server.listen(boost::asio::ip::tcp::v4(), port);
+  } else {
+    m_server.listen(host, std::to_string(port));
+  }
+
+  IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Starting connection acceptance\n");
+  m_server.start_accept(ec);
+  if (ec) {
+    throw ErrorException(Server::getErrorMessage(ec));
+  }
+
+  IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Running I/O service loop\n");
+  m_server.run();
+}
+
+
+const char*
+Server::getErrorMessage(const websocketpp::lib::error_code& ec) noexcept
+{
+  std::stringstream ecs;
+  ecs << ec << " (" << ec.message() << ")";
+  return (ecs.str()).c_str();
+}
+
+
+Command::element_t
+Server::convertPtreeValue(const ptree::value_type& v) noexcept
+{
+  return Command::element_t(v.first.data(), v.second.data());
+}
+
 
 
 static void

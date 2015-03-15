@@ -20,15 +20,15 @@
 #ifndef IMTOOLS_HXX
 #define IMTOOLS_HXX
 
+#include <opencv2/core/core.hpp>
+
 #include "template.cxx"
 
 #ifdef IMTOOLS_THREADS
 # include <thread> // std::thread::hardware_concurrency()
+# include "threads.hxx"
 #endif
 
-#include <opencv2/core/core.hpp>
-
-#include "threads.hxx"
 #include "log.hxx"
 #include "exceptions.hxx"
 #include "imtools-meta.hxx"
@@ -55,7 +55,6 @@
 /////////////////////////////////////////////////////////////////////
 namespace imtools {
 
-
 /// Minimum area of a bounding box to be considered "big enough" in square pixels
 /// Bounding boxes having smaller area will be merged together by means of morphological operations.
 const int MIN_BOUND_BOX_AREA = 2800;
@@ -80,13 +79,6 @@ max_threads()
 
 bool file_exists(const char* filename);
 bool file_exists(const std::string& filename);
-
-#if 0 // unused
-/// Checks if two paths are pointing to the same file.
-bool equivalent_paths(const char* path1, const char* path2);
-#endif
-
-//int get_int_opt_arg(const char* const optarg, const char* format, ...);
 
 /// Computes difference between two image matrices.
 ///

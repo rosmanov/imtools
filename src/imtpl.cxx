@@ -1,7 +1,6 @@
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
 #include "imtools.hxx"
-
-using namespace std;
-using namespace cv;
 
 static const char* g_program_name;
 
@@ -18,6 +17,7 @@ usage(bool is_error)
   fprintf(is_error ? stdout : stderr, usage_template, g_program_name);
   exit(is_error ? 1 : 0);
 }
+
 
 int main(int argc, char **argv)
 {
@@ -36,11 +36,11 @@ int main(int argc, char **argv)
     }
   }
 
-  Mat img, tpl, result;
+  cv::Mat img, tpl, result;
   cv::Point match_loc;
 
-  img = imread(argv[1], 1);
-  tpl = imread(argv[2], 1);
+  img = cv::imread(argv[1], 1);
+  tpl = cv::imread(argv[2], 1);
 
   imtools::match_template(match_loc, img, tpl);
 

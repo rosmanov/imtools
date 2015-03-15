@@ -43,10 +43,10 @@ class Command
     /// Executes command.
     virtual void run() const = 0;
 
-    /// Returns numeric representation of option name for comparisions.
+    /// \returns numeric representation of option name for comparisions.
     virtual int getOptionCode(const std::string& o) const = 0;
 
-    /// Returns numeric representation of command name for comparisions.
+    /// \returns numeric representation of command name for comparisions.
     static Type getType(const std::string& c);
 
     static const compression_params_t getCompressionParams()
@@ -54,9 +54,14 @@ class Command
       return s_compression_params;
     }
 
+    virtual inline void setAllowAbsolutePaths(bool v) { m_allow_absolute_paths = v; }
+
   protected:
     /// Format-specific save parameters for `cv::imwrite()`.
     static compression_params_t s_compression_params;
+    /// Whether to allow absolute path processing
+    bool m_allow_absolute_paths;
+
 };
 
 /////////////////////////////////////////////////////////////////////

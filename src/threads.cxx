@@ -24,17 +24,27 @@ it_lock_t io_lock;
 
 
 it_thread_id_t
-get_id()
+get_id() noexcept
 {
-#ifdef USE_OPENMP
   return omp_get_thread_num();
-#else
-  return boost::this_thread::get_id();
-#endif
+}
+
+
+OmpGuard::OmpGuard(omp_lock_t& lock) noexcept
+: mLock(lock)
+{
+  omp_init_lock(&mLock);
+  omp_set_lock(&mLock);
+}
+
+
+OmpGuard::~OmpGuard()
+{
+  omp_unset_lock(&mLock);
+  omp_destroy_lock(&mLock);
 }
 
 }} // namespace imtools::threads
 
 #endif // IMTOOLS_THREADS
-
 // vim: et ts=2 sts=2 sw=2

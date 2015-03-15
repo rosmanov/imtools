@@ -1,3 +1,6 @@
+#include <getopt.h>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include "imtools.hxx"
 
 static const char* g_program_name;
