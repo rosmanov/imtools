@@ -20,12 +20,14 @@
  */
 #include "imresize-api.hxx"
 
+#include <cmath> // for isgreater()
 #include <string>
+#include <boost/algorithm/string/trim.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+
 #include "log.hxx"
 #include "exceptions.hxx"
-
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
 
 using imtools::imresize::ResizeCommand;
 
@@ -50,8 +52,38 @@ ResizeCommand::ResizeCommand(const std::string& source,
 {
 }
 
+int
+ResizeCommand::getInterpolationCode(const std::string& m) const noexcept
+{
+  const int DEFAULT_CODE = cv::INTER_LINEAR;
+  int code;
+
+  switch (m[0]) {
+    case 'n':
+      code = m == "nearest" ? cv::INTER_NEAREST : DEFAULT_CODE;
+      break;
+    case 'l':
+      if (m == "linear")
+        code = cv::INTER_LINEAR;
+      else if (m == "lanczos4")
+        code = cv::INTER_LANCZOS4;
+      else
+        code = DEFAULT_CODE;
+      break;
+    case 'a':
+      code = m == "area" ? cv::INTER_AREA : DEFAULT_CODE;
+      break;
+    case 'c':
+      code = m == "cubic" ? cv::INTER_CUBIC : DEFAULT_CODE;
+      break;
+  }
+
+  return code;
+}
+
 
 ResizeCommand::ResizeCommand(const element_vector_t& elements) noexcept
+: m_width(0), m_height(0), m_fx(0.0), m_fy(0.0)
 {
   for (auto& it : elements) {
     std::string value = it.second.data();
@@ -61,13 +93,13 @@ ResizeCommand::ResizeCommand(const element_vector_t& elements) noexcept
     verbose_log("key: %s, value: %s, option: %d\n", key.c_str(), value.c_str(), option);
 
     switch (option) {
-      case Option::SOURCE:        m_source        = value;            break;
-      case Option::OUTPUT:        m_output        = value;            break;
-      case Option::WIDTH:         m_width         = std::stoi(value); break;
-      case Option::HEIGHT:        m_height        = std::stoi(value); break;
-      case Option::FX:            m_fx            = stod(value);      break;
-      case Option::FY:            m_fy            = stod(value);      break;
-      case Option::INTERPOLATION: m_interpolation = stoi(value);      break;
+      case Option::SOURCE:        m_source        = value;                       break;
+      case Option::OUTPUT:        m_output        = value;                       break;
+      case Option::WIDTH:         m_width         = std::stoi(value);            break;
+      case Option::HEIGHT:        m_height        = std::stoi(value);            break;
+      case Option::FX:            m_fx            = stod(value);                 break;
+      case Option::FY:            m_fy            = stod(value);                 break;
+      case Option::INTERPOLATION: m_interpolation = getInterpolationCode(value); break;
       default: warning_log("Skipping unknown key '%s'\n", key.c_str()); break;
     }
   }
@@ -112,25 +144,33 @@ ResizeCommand::getOptionCode(const std::string& o) const noexcept
 void
 ResizeCommand::run() const
 {
-  cv::Mat source;
-  cv::Mat output;
+  auto trim_chars = boost::algorithm::is_any_of(" \t\r\n/");
+  std::string source_filename(m_allow_absolute_paths
+      ? m_source
+      : boost::algorithm::trim_left_copy_if(m_source, trim_chars));
+  std::string output_filename(m_allow_absolute_paths
+      ? m_output
+      : boost::algorithm::trim_left_copy_if(m_output, trim_chars));
 
-  source = cv::imread(m_source, 1);
+  cv::Mat source(cv::imread(source_filename, 1));
   if (source.empty()) {
-    throw ErrorException("Source image '%s' is empty", m_source.c_str());
+    throw ErrorException("Source image '%s' doesn't exist", source_filename.c_str());
   }
 
-  if (m_width > 0 && m_height > 0) {
+  cv::Mat output;
+  if ((m_width > 0 && m_height > 0)
+      || (std::isgreater(m_fx, 0.0) && std::isgreater(m_fy, 0.0)))
+  {
+    debug_log("cv::resize(s, o, size(%d, %d), %f, %f, %i)\n",
+        m_width, m_height, m_fx, m_fy, m_interpolation);
     cv::resize(source, output, cv::Size(m_width, m_height), m_fx, m_fy, m_interpolation);
-  } else if (m_fx > 0 && m_fy > 0) {
-    cv::resize(source, output, cv::Size(), m_fx, m_fy, m_interpolation);
   } else {
-    throw ErrorException("Expected positive number pairs of whether width/height, or fx/fy."
-        "None provided. Nothing to do.");
+    throw ErrorException("Expected pairs of positive numbers: "
+        "whether width/height, or fx/fy. None provided.");
   }
 
-  if (!cv::imwrite(m_output, output, Command::getCompressionParams())) {
-    throw FileWriteErrorException(m_output);
+  if (!cv::imwrite(output_filename, output, getCompressionParams())) {
+    throw FileWriteErrorException(output_filename);
   }
 }
 

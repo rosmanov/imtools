@@ -318,7 +318,7 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
   ptree pt;
   ptree pt_arg;
   std::stringstream ss(msg->get_payload());
-  std::string error;
+  std::string message;
 
   try {
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Parsing JSON: %s\n", ss.str().c_str());
@@ -336,19 +336,23 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
     command_ptr->setAllowAbsolutePaths(getAllowAbsolutePaths());
     command_ptr->run();
   } catch (boost::property_tree::json_parser_error& e) {
-    error = std::string("Invalid JSON: ") + e.what();
+    message = std::string("Invalid JSON: ") + e.what();
     error_log("Failed to parse json: %s, input: %s\n", e.what(), ss.str().c_str());
   } catch (ErrorException& e) {
-    error = std::string("Fatal error: ") + e.what();
-    error_log("%s\n", error.c_str());
+    message = std::string("Fatal error: ") + e.what();
+    error_log("%s\n", message.c_str());
   } catch (...) {
-    error = "Internal Server Error";
+    message = "Internal Server Error";
     error_log("Unknown error in '%s'!!! Please file a bug.\n", __func__);
   }
 
-  if (!error.empty()) {
-    debug_log("sending error message: %s\n", error.c_str());
-    sendMessage(conn, error, Server::MessageType::ERROR);
+  if (message.empty()) {
+    debug_log0("sending success message\n");
+    message = "OK";
+    sendMessage(conn, message, Server::MessageType::SUCCESS);
+  } else {
+    debug_log("sending error message: %s\n", message.c_str());
+    sendMessage(conn, message, Server::MessageType::ERROR);
   }
 }
 

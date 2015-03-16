@@ -59,6 +59,8 @@ class ResizeCommand : public ::imtools::Command
 
     /// Returns numeric representation of option name for comparisions.
     virtual int getOptionCode(const std::string& o) const noexcept;
+    /// Returns numeric representation of interpolation method name
+    virtual int getInterpolationCode(const std::string& m) const noexcept;
 
   protected:
     /// Source image path

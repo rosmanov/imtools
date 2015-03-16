@@ -42,7 +42,17 @@
     <b>Message to send:</b>
     <input onkeypress="if(this.value) {if (window.event.keyCode == 13) { sendMessage(this.value); this.value = null; }}"/>
     <input type="button" name="b" id="b" value="send object"
-    onclick="sendMessage({command: 'imresize', arguments:{'source':'/some/path/to/image.png', 'output':'/some/path/to/output.png', 'verbose': 1}})" />
+    onclick="sendMessage({
+      command: 'imresize',
+      arguments:{
+        'source':'/image.png',
+        'output':'/thumbnail.png',
+        'interpolation':'area',
+        'fx' : 0.5,
+        'fy' : 0.5,
+        'verbose': 1
+      }
+    })" />
     <div id="output"></div>
   </body>
 </html>

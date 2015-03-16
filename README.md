@@ -100,6 +100,20 @@ _Arguments_:
       }
     }
 
+
+*Response format of `imresize` command*
+
+    {
+      "error" : "ERROR_CODE",
+      "response" : "MESSAGE"
+    }
+
+where `ERROR_CODE` is `"0"` on success, or `"1"` otherwise; `MESSAGE` is `"OK"` on success, or
+error message on error, e.g.:
+
+    {"error":"0","response":"OK"}
+
+
 [Nginx](http://nginx.org) configuration:
 
     location /websocket {
