@@ -73,6 +73,20 @@ const struct option g_long_options[] = {
 };
 
 
+/////////////////////////////////////////////////////////////////////
+/// Misc. utilities
+class Util
+{
+  public:
+    Util() = delete;
+
+    static const char* getErrorMessage(const websocketpp::lib::error_code& ec) noexcept;
+    /// Unary operation for std::transform(). Converts property tree value to Command::element_t.
+    static Command::element_t convertPtreeValue(const boost::property_tree::ptree::value_type& v) noexcept;
+    /// \returns SHA-1 digest for `source` in hexadecimal format
+    static std::string makeSHA1(const std::string& source) noexcept;
+};
+
 
 /////////////////////////////////////////////////////////////////////
 /// Server configuration for an application
@@ -84,13 +98,13 @@ class Config : public std::enable_shared_from_this<Config>
     {
       /// Unhandled option type
       UNKNOWN,
-      /// for `port`
+      /// `port`
       PORT,
-      /// for `host`
+      /// `host`
       HOST,
-      /// for `chdir`
+      /// `chdir`
       CHDIR,
-      /// for `allow_absolute_paths`
+      /// `allow_absolute_paths`
       ALLOW_ABSOLUTE_PATHS
     };
 
@@ -175,10 +189,6 @@ class Server : public std::enable_shared_from_this<Server>
 
   protected:
     typedef std::set<Connection, std::owner_less<Connection>> ConnectionList;
-
-    static const char* getErrorMessage(const websocketpp::lib::error_code& ec) noexcept;
-    /// Unary operation for std::transform(). Converts property tree value to Command::element_t.
-    static Command::element_t convertPtreeValue(const boost::property_tree::ptree::value_type& v) noexcept;
 
     /// Sends response message to the client.
     virtual void sendMessage(Connection conn, const std::string& message, MessageType type) noexcept;

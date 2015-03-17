@@ -21,12 +21,14 @@
 #include "imserver.hxx"
 
 #include <sstream>
+#include <iomanip> // std::hex, std::fill, std::setw for SHA-1
 #include <signal.h>
 #include <sys/wait.h>
 #include <algorithm> // for std::transform()
 #include <iterator> // for std::back_inserter()
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+#include <boost/uuid/sha1.hpp>
 
 #include "imtools.hxx"
 
@@ -43,6 +45,7 @@ using imtools::CommandFactory;
 using imtools::imserver::g_server;
 using imtools::imserver::Config;
 using imtools::imserver::Server;
+using imtools::imserver::Util;
 using imtools::imserver::ConfigPtrList;
 
 using boost::property_tree::ptree;
@@ -250,7 +253,7 @@ Server::stop()
 
   m_server.stop_listening(ec);
   if (ec) {
-    IMTOOLS_SERVER_OBJECT_LOG(error, "Failed to stop listening: %s\n", Server::getErrorMessage(ec));
+    IMTOOLS_SERVER_OBJECT_LOG(error, "Failed to stop listening: %s\n", Util::getErrorMessage(ec));
   }
 
   std::string reason;
@@ -258,7 +261,7 @@ Server::stop()
     m_server.close(it, websocketpp::close::status::normal, reason, ec);
 
     if (ec) {
-      IMTOOLS_SERVER_OBJECT_LOG(error, "Failed to close connection: %s\n", Server::getErrorMessage(ec));
+      IMTOOLS_SERVER_OBJECT_LOG(error, "Failed to close connection: %s\n", Util::getErrorMessage(ec));
     }
   }
   if (!ec) {
@@ -283,7 +286,7 @@ Server::sendMessage(Connection conn, const std::string& message, MessageType typ
 
     m_server.send(conn, json_stream.str(), websocketpp::frame::opcode::text, ec);
     if (ec) {
-      error_log("Fatal error in %s: %s\n", __func__, Server::getErrorMessage(ec));
+      error_log("Fatal error in %s: %s\n", __func__, Util::getErrorMessage(ec));
     }
   } catch (boost::property_tree::ptree_bad_data& e) {
     error_log("Failed to generate JSON: %s\n", e.what());
@@ -327,7 +330,7 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
     Command::element_vector_t elements;
     pt_arg = pt.get_child("arguments");
     std::transform(std::begin(pt_arg), std::end(pt_arg),
-        std::back_inserter(elements), Server::convertPtreeValue);
+        std::back_inserter(elements), Util::convertPtreeValue);
 
     auto command_name = pt.get<std::string>("command");
     auto command_ptr = get_command(Command::getType(command_name), elements);
@@ -375,7 +378,7 @@ Server::run()
 
   m_server.init_asio(ec);
   if (ec) {
-    throw ErrorException(Server::getErrorMessage(ec));
+    throw ErrorException(Util::getErrorMessage(ec));
   }
 
   std::string chdir_dir(getChdirDir());
@@ -396,7 +399,7 @@ Server::run()
   IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Starting connection acceptance\n");
   m_server.start_accept(ec);
   if (ec) {
-    throw ErrorException(Server::getErrorMessage(ec));
+    throw ErrorException(Util::getErrorMessage(ec));
   }
 
   IMTOOLS_SERVER_OBJECT_LOG0(verbose, "Running I/O service loop\n");
@@ -405,7 +408,7 @@ Server::run()
 
 
 const char*
-Server::getErrorMessage(const websocketpp::lib::error_code& ec) noexcept
+Util::getErrorMessage(const websocketpp::lib::error_code& ec) noexcept
 {
   std::stringstream ecs;
   ecs << ec << " (" << ec.message() << ")";
@@ -414,11 +417,29 @@ Server::getErrorMessage(const websocketpp::lib::error_code& ec) noexcept
 
 
 Command::element_t
-Server::convertPtreeValue(const ptree::value_type& v) noexcept
+Util::convertPtreeValue(const ptree::value_type& v) noexcept
 {
   return Command::element_t(v.first.data(), v.second.data());
 }
 
+
+std::string
+Util::makeSHA1(const std::string& source) noexcept
+{
+  std::stringstream ss;
+  unsigned int hash[5];
+  boost::uuids::detail::sha1 sha1;
+
+  sha1.process_bytes(source.c_str(), source.size());
+  sha1.get_digest(hash);
+
+  ss << std::hex << std::setfill('0') << std::setw(sizeof(int) * 2);
+  for (std::size_t i = 0; i < sizeof(hash) / sizeof(hash[0]); ++i) {
+    ss << hash[i];
+  }
+
+  return ss.str();
+}
 
 
 static void
