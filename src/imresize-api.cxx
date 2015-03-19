@@ -174,4 +174,18 @@ ResizeCommand::run() const
   }
 }
 
+
+std::string
+ResizeCommand::serialize() const noexcept
+{
+    std::stringstream ss;
+
+    ss << m_source << m_output
+      << m_width << m_height
+      << m_fx << m_fy;
+
+    return ss.str();
+}
+
+
 // vim: et ts=2 sts=2 sw=2

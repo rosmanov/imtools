@@ -28,7 +28,12 @@
 #include <iterator> // for std::back_inserter()
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+
+#if 0
 #include <boost/uuid/sha1.hpp>
+#else
+#include <websocketpp/sha1/sha1.hpp>
+#endif
 
 #include "imtools.hxx"
 
@@ -124,12 +129,16 @@ usage(bool is_error)
 }
 
 
-static std::unique_ptr<Command>
+static imtools::imserver::CommandPtr
 get_command(Command::Type type, const Command::element_vector_t& elements)
 {
   std::unique_ptr<CommandFactory> factory_ptr;
 
   switch (type) {
+    case Command::Type::META:
+      throw ErrorException("Command::Type::META not implemented");
+      break;
+
     case Command::Type::RESIZE:
       factory_ptr = std::unique_ptr<CommandFactory>(new imtools::imresize::ResizeCommandFactory());
       break;
@@ -142,14 +151,30 @@ get_command(Command::Type type, const Command::element_vector_t& elements)
       throw ErrorException("Unknown command code: %d", type);
   }
 
-  return std::unique_ptr<Command>(factory_ptr->create(elements));
+  return imtools::imserver::CommandPtr(factory_ptr->create(elements));
+}
+
+
+Config::Config(const std::string& app_name,
+    uint16_t port,
+    const std::string& host,
+    const std::string& chdir_dir,
+    bool allow_absolute_paths,
+    const std::string& key)
+: m_app_name(app_name),
+  m_port(port),
+  m_host(host),
+  m_chdir(chdir_dir),
+  m_allow_absolute_paths(allow_absolute_paths),
+  m_private_key(key)
+{
 }
 
 
 Config::Option
 Config::getOption(const std::string& k)
 {
-  if (k.length() < 4) {
+  if (k.length() < 3) {
     return Config::Option::UNKNOWN;
   }
 
@@ -167,6 +192,9 @@ Config::getOption(const std::string& k)
       break;
     case 'a':
       option = k == "allow_absolute_paths" ? Config::Option::ALLOW_ABSOLUTE_PATHS : Config::Option::UNKNOWN;
+      break;
+    case 'k':
+      option = k == "key" ? Config::Option::PRIVATE_KEY : Config::Option::UNKNOWN;
       break;
     default:
       option = Config::Option::UNKNOWN;
@@ -197,6 +225,7 @@ Config::parse(const std::string& filename)
       std::string host;
       bool allow_absolute_paths = false;
       std::string chdir_dir;
+      std::string key;
 
       for (const auto& cfg_iter : pt_cfg) {
         std::string k = cfg_iter.first.data();
@@ -217,6 +246,9 @@ Config::parse(const std::string& filename)
           case Config::Option::ALLOW_ABSOLUTE_PATHS:
             allow_absolute_paths = (v == "true");
             break;
+          case Config::Option::PRIVATE_KEY:
+            key = v;
+            break;
           case Config::Option::UNKNOWN: // no break
           default:
             warning_log("Unknown option code: %d\n", option);
@@ -226,8 +258,8 @@ Config::parse(const std::string& filename)
 
       if (port) {
         verbose_log("Adding server %s:%u\n", host.c_str(), port);
-        list.push_back(imtools::imserver::ConfigPtr(new Config(port, host,
-                chdir_dir, allow_absolute_paths)));
+        list.push_back(imtools::imserver::ConfigPtr(new Config(app_name, port, host,
+                chdir_dir, allow_absolute_paths, key)));
       } else {
         warning_log("No valid input values found for application '%s'. "
             "Skipping.\n", app_name.c_str());
@@ -335,6 +367,12 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
     auto command_name = pt.get<std::string>("command");
     auto command_ptr = get_command(Command::getType(command_name), elements);
 
+    IMTOOLS_SERVER_OBJECT_LOG(debug, "Checking digest for command '%s'\n", command_name.c_str());
+    if (!checkCommandDigest(*command_ptr, pt.get<std::string>("digest"))) {
+      sendMessage(conn, "Invalid digest", Server::MessageType::ERROR);
+      return;
+    }
+
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Running command: '%s'\n", command_name.c_str());
     command_ptr->setAllowAbsolutePaths(getAllowAbsolutePaths());
     command_ptr->run();
@@ -426,19 +464,30 @@ Util::convertPtreeValue(const ptree::value_type& v) noexcept
 std::string
 Util::makeSHA1(const std::string& source) noexcept
 {
-  std::stringstream ss;
+  std::ostringstream oss;
+
+#if 0 // use boost::uuid::detail::sha1
   unsigned int hash[5];
   boost::uuids::detail::sha1 sha1;
 
   sha1.process_bytes(source.c_str(), source.size());
   sha1.get_digest(hash);
 
-  ss << std::hex << std::setfill('0') << std::setw(sizeof(int) * 2);
+  oss << std::hex << std::setfill('0') << std::setw(sizeof(hash[0]) * 2);
   for (std::size_t i = 0; i < sizeof(hash) / sizeof(hash[0]); ++i) {
-    ss << hash[i];
+    oss << hash[i];
   }
+#else // use websocketpp::sha1
+  unsigned char hash[20];
+  websocketpp::sha1::calc(source.c_str(), source.length(), hash);
 
-  return ss.str();
+  oss << std::hex << std::setfill('0') << std::setw(sizeof(hash[0]) * 2);
+  for (const unsigned char* ptr = hash; ptr < hash + 20; ptr++) {
+    oss << (unsigned int) *ptr;
+  }
+#endif
+
+  return oss.str();
 }
 
 

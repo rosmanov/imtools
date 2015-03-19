@@ -25,18 +25,14 @@ Command::compression_params_t Command::s_compression_params;
 Command::Type
 Command::getType(const std::string& c)
 {
-  if (c.length() < 3) {
-    return Type::UNKNOWN;
-  }
-
   Command::Type code;
 
-  switch (c[2]) {
+  switch (c[0]) {
     case 'r':
-      code = c == "imresize" ? Command::Type::RESIZE : Command::Type::UNKNOWN;
+      code = c == "resize" ? Command::Type::RESIZE : Command::Type::UNKNOWN;
       break;
     case 'm':
-      code = c == "immerge"  ? Command::Type::MERGE  : Command::Type::UNKNOWN;
+      code = c == "merge"  ? Command::Type::MERGE  : Command::Type::UNKNOWN;
       break;
     default:
       code = Command::Type::UNKNOWN;

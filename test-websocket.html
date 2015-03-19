@@ -43,7 +43,7 @@
     <input onkeypress="if(this.value) {if (window.event.keyCode == 13) { sendMessage(this.value); this.value = null; }}"/>
     <input type="button" name="b" id="b" value="send object"
     onclick="sendMessage({
-      command: 'imresize',
+      command: 'resize',
       arguments:{
         'source':'/image.png',
         'output':'/thumbnail.png',
@@ -51,7 +51,8 @@
         'fx' : 0.5,
         'fy' : 0.5,
         'verbose': 1
-      }
+      },
+      digest: '757fbf76324d533fb9facad748312ac9fbf326b6'
     })" />
     <div id="output"></div>
   </body>

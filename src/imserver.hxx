@@ -39,6 +39,7 @@ class Config;
 typedef std::shared_ptr<Server> ServerPtr;
 typedef std::shared_ptr<Config> ConfigPtr;
 typedef std::vector<ConfigPtr> ConfigPtrList;
+typedef std::unique_ptr<imtools::Command> CommandPtr;
 typedef websocketpp::connection_hdl Connection;
 typedef websocketpp::server<websocketpp::config::asio> WebSocketServer;
 
@@ -105,7 +106,9 @@ class Config : public std::enable_shared_from_this<Config>
       /// `chdir`
       CHDIR,
       /// `allow_absolute_paths`
-      ALLOW_ABSOLUTE_PATHS
+      ALLOW_ABSOLUTE_PATHS,
+      /// `key`
+      PRIVATE_KEY
     };
 
     Config() = delete;
@@ -113,38 +116,38 @@ class Config : public std::enable_shared_from_this<Config>
     Config& operator=(const Config&) = delete;
 
     virtual ~Config() {}
-    explicit Config(uint16_t port,
-        const std::string& host,
-        const std::string& chdir_dir,
-        bool allow_absolute_paths)
-      : m_port(port),
-        m_host(host),
-        m_chdir(chdir_dir),
-        m_allow_absolute_paths(allow_absolute_paths) {}
+    explicit Config(const std::string& app_name, uint16_t port, const std::string& host,
+        const std::string& chdir_dir, bool allow_absolute_paths, const std::string& key);
 
     /// Parses a configuration file
     /// \param filename Path to configuration file
     /// \returns a set of configuration instances.
     static ConfigPtrList parse(const std::string& filename);
 
+    inline const std::string& getAppName() const noexcept { return m_app_name; }
     inline uint16_t getPort() const noexcept { return m_port; }
     inline const std::string& getHost() const noexcept { return m_host; }
     inline const std::string& getChdirDir() const noexcept { return m_chdir; }
     inline bool getAllowAbsolutePaths() const noexcept { return m_allow_absolute_paths; }
+    inline const std::string& getPrivateKey() const noexcept { return m_private_key; }
 
   protected:
     /// \param k Option name
     /// \returns Numeric representation of option name
     static Option getOption(const std::string& k);
 
-    /// Value of 'port' configuration option.
+    /// Application name.
+    std::string m_app_name;
+    /// Value of 'port' option.
     uint16_t m_port;
-    /// Value of 'host' configuration option.
+    /// Value of 'host' option.
     std::string m_host;
-    /// Value of 'chdir' configuration option.
+    /// Value of 'chdir' option.
     std::string m_chdir;
-    /// Value of 'allow_absolute_paths' configuration option.
+    /// Value of 'allow_absolute_paths' option.
     bool m_allow_absolute_paths;
+    /// Value of 'key' option.
+    std::string m_private_key;
 };
 
 
@@ -186,12 +189,21 @@ class Server : public std::enable_shared_from_this<Server>
     inline const std::string& getChdirDir() const noexcept { return m_config->getChdirDir(); }
     /// Returns value of 'allow_absolute_paths' configuration option.
     inline bool getAllowAbsolutePaths() const noexcept { return m_config->getAllowAbsolutePaths(); }
+    /// \returns Application name specified in the configuration file.
+    inline const std::string& getAppName() const noexcept { return m_config->getAppName(); }
+    /// \returns application private key specified in the configuration file
+    inline const std::string& getPrivateKey() const noexcept { return m_config->getPrivateKey(); }
 
   protected:
     typedef std::set<Connection, std::owner_less<Connection>> ConnectionList;
 
     /// Sends response message to the client.
     virtual void sendMessage(Connection conn, const std::string& message, MessageType type) noexcept;
+
+    virtual inline bool checkCommandDigest(const imtools::Command& command, const std::string& digest) const
+    {
+      return (digest == Util::makeSHA1(getAppName() + command.serialize() + getPrivateKey()));
+    }
 
     /// Configuration of an application
     ConfigPtr m_config;
@@ -203,6 +215,5 @@ class Server : public std::enable_shared_from_this<Server>
 
 /////////////////////////////////////////////////////////////////////
 }} // namespace imtools::imserver
-
 #endif // IMTOOLS_IMSERVER_HXX
 // vim: et ts=2 sts=2 sw=2

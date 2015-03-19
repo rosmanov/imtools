@@ -57,6 +57,9 @@ class ResizeCommand : public ::imtools::Command
     // Executes the command
     virtual void run() const;
 
+    /// \returns command-specific data serialized in a string
+    virtual std::string serialize() const noexcept;
+
     /// Returns numeric representation of option name for comparisions.
     virtual int getOptionCode(const std::string& o) const noexcept;
     /// Returns numeric representation of interpolation method name

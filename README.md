@@ -64,18 +64,19 @@ WebSocket server which can be used for real-time image processing on a Web site.
     port=9809
     chdir=/home/ruslan/projects/imtools/bin
     allow_absolute_paths=false
+    key=yeBOfetLDTkP
 
     [application_N]
     port=9810
     host=127.0.0.10
     ...
 
-*Request format for `imresize` command*
+*Request format for `resize` command*
 
     {
-      "command" : "imresize",
-      "arguments" : { argument properties ... }
-      }
+      "command" : "resize",
+      "arguments" : { argument properties ... },
+      "digest" : "command-specific message digest"
     }
 
 
@@ -88,20 +89,39 @@ _Arguments_:
 - `fy` - scale factor for vertical axis, e.g.: 0.5
 - `interpolation` - Interpolation method (_see output of_ `imresize --help` _command_)
 
+The message digest should be built by formula:
+    digest = SHA1(application_name + arguments + key)
+
+where
+- `SHA1()` function computes SHA-1 hash,
+- `application_name` is the name of application defined in the configuration file,
+- `arguments` is a command-specific serialized string,
+- `key` represents private key, which is configured per application in the configuration file:
+
+Serialized arguments for `resize` command:
+
+    source + output + width + height + fx + fy
+
 *Request example: make 50%-thumbnail from source.png and save it to thumbnail.png*
 
     {
-      "command" : "imresize",
+      "command" : "resize",
       "arguments" : {
         "source" : "source.png",
         "output" : "thumbnail.png",
         "fx" : 0.5,
         "fy" : 0.5
-      }
+      },
+      "digest" : "f9a28c6f5b71d054a899eb8ca44a5c5903bef61e"
     }
 
+where `digest` is computed as
 
-*Response format of `imresize` command*
+     sha1('application_1' + 'source.png' + 'thumbnail.png'
+     + '0' + '0' + '0.5' + '0.5' + 'yeBOfetLDTkP');
+
+
+*Response format of `resize` command*
 
     {
       "error" : "ERROR_CODE",

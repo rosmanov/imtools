@@ -36,16 +36,25 @@ class Command
     /// Command type
     enum class Type {
       UNKNOWN,
+      /// Retreives common meta information (ImTools version etc.)
+      META,
+      /// `imresize` command
       RESIZE,
+      /// `immerge` command
       MERGE
     };
 
     /// Executes command.
     virtual void run() const = 0;
 
+    /// \param o option name
     /// \returns numeric representation of option name for comparisions.
     virtual int getOptionCode(const std::string& o) const = 0;
 
+    /// \returns command-specific data serialized in a string (for crypto digests)
+    virtual std::string serialize() const noexcept = 0;
+
+    /// \param c command name such as `immerge`
     /// \returns numeric representation of command name for comparisions.
     static Type getType(const std::string& c);
 
