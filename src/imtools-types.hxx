@@ -28,18 +28,18 @@
 namespace imtools {
 /////////////////////////////////////////////////////////////////////
 typedef unsigned int uint_t;
-typedef cv::Rect bound_box_t;
-typedef std::vector<bound_box_t> bound_box_vector_t;
-typedef std::vector<std::string> images_vector_t;
+typedef cv::Rect BoundBox;
+typedef std::vector<BoundBox> BoundBoxVector;
+typedef std::vector<std::string> ImageArray;
 
-enum blur_type {
+enum Blur {
   BLUR_NONE   = 0,
   BLUR        = 1,
   BLUR_GAUSS  = 2,
   BLUR_MEDIAN = 3
 };
 
-enum threshold_type {
+enum Threshold {
   /// Default modification threshold (in percents).
   //THRESHOLD_MOD = 25,
   /// Default minimum noise suppression threshold.

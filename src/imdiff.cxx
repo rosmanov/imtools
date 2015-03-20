@@ -23,7 +23,7 @@ static cv::Mat diff_img, old_img, new_img;
 
 const char *result_window_title = "Result";
 
-static imtools::blur_type g_blur_type = imtools::BLUR_NONE;
+static imtools::Blur g_Blur = imtools::BLUR_NONE;
 
 static const char* usage_template = "Usage: %s OPTIONS old_image new_image\n\n"
 "Computes difference between two images of the same size.\n\n"
@@ -63,8 +63,8 @@ thresh_callback(int, void*)
 
   imtools::threshold(g_out);
 
-  if (g_blur_type != imtools::BLUR_NONE) {
-    imtools::blur(g_out, g_blur_type);
+  if (g_Blur != imtools::BLUR_NONE) {
+    imtools::blur(g_out, g_Blur);
   }
 
   cv::imshow(result_window_title, g_out);
@@ -77,7 +77,7 @@ blur_callback(int state, void* user_data)
     return;
   }
 
-  g_blur_type = (imtools::blur_type)(intptr_t)user_data;
+  g_Blur = (imtools::Blur)(intptr_t)user_data;
 
   thresh_callback(0, 0);
 }

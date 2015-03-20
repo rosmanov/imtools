@@ -91,14 +91,17 @@ diff(cv::Mat& result, const cv::Mat& a, const cv::Mat& b)
   cv::absdiff(a, b, result);
 
   // Convert to grayscale
-  cv::cvtColor(result, result, CV_BGR2GRAY);
+  debug_log("diff: cvtColor() to grayscale, channels = %d\n", result.channels());
+  if (result.channels() > 1) {
+    cv::cvtColor(result, result, CV_BGR2GRAY);
+  }
 
   debug_timer_end(t1, t2, imtools::diff);
 }
 
 
 void
-blur(cv::Mat& target, const blur_type type)
+blur(cv::Mat& target, const Blur type)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
@@ -215,7 +218,7 @@ patch(cv::Mat& out_mat, const cv::Mat& tpl_mat, const cv::Rect& roi)
  * See http://stackoverflow.com/questions/24586923/how-do-i-apply-dilation-selectively-using-opencv?noredirect=1#comment38089974_24586923
  */
 static void
-_merge_small_boxes(bound_box_vector_t& result, bound_box_vector_t& boxes, const cv::Mat& bin_mask)
+_merge_small_boxes(BoundBoxVector& result, BoundBoxVector& boxes, const cv::Mat& bin_mask)
 {
   cv::Mat tmp_mask = bin_mask.clone();
 
@@ -223,7 +226,7 @@ _merge_small_boxes(bound_box_vector_t& result, bound_box_vector_t& boxes, const 
   result.reserve(boxes.size() >> 2);
 
   // Store big enough boxes into `result`
-  for (bound_box_vector_t::iterator it = boxes.begin(); it != boxes.end(); ++it) {
+  for (BoundBoxVector::iterator it = boxes.begin(); it != boxes.end(); ++it) {
     if ((*it).area() >= MIN_BOUND_BOX_AREA) {
       result.push_back(*it);
 
@@ -338,12 +341,12 @@ make_heterogeneous(cv::Rect& rect, const cv::Mat& src)
 
 
 void
-bound_boxes(bound_box_vector_t& result, const cv::Mat& in_mask, int min_threshold, int max_threshold)
+bound_boxes(BoundBoxVector& result, const cv::Mat& in_mask, int min_threshold, int max_threshold)
 {
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
-  bound_box_vector_t boxes;
+  BoundBoxVector boxes;
   cv::Mat mask;
   std::vector<std::vector<cv::Point> > contours;
   std::vector<cv::Vec4i> hierarchy;

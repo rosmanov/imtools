@@ -13,8 +13,8 @@ static int g_x, g_y;
 static std::string g_tpl_filename;
 
 // Destination images
-typedef std::vector<std::string> images_vector_t;
-static images_vector_t g_dst_images;
+typedef std::vector<std::string> ImageArray;
+static ImageArray g_dst_images;
 
 
 static const char* usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
@@ -55,7 +55,7 @@ patch()
   int x2 = g_x + tpl_mat.cols, y2 = g_y + tpl_mat.rows;
   verbose_log("Template rect. coords: %d %d %d %d", g_x, g_y, x2, y2);
 
-  for (images_vector_t::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it) {
+  for (ImageArray::iterator it = g_dst_images.begin(); it != g_dst_images.end(); ++it) {
     verbose_log("Patching '%s'...", it->c_str());
 
     cv::Mat out_mat;

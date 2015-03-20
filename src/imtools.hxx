@@ -25,7 +25,6 @@
 #include "template.cxx"
 
 #ifdef IMTOOLS_THREADS
-# include <thread> // std::thread::hardware_concurrency()
 # include "threads.hxx"
 #endif
 
@@ -68,15 +67,6 @@ extern uint_t verbose;
 
 void print_version();
 
-#ifdef IMTOOLS_THREADS
-/// Returns number of concurrent threads supported.
-inline unsigned
-max_threads()
-{
-  return std::thread::hardware_concurrency();
-}
-#endif
-
 
 bool file_exists(const char* filename);
 bool file_exists(const std::string& filename);
@@ -93,7 +83,7 @@ const char* get_features();
 void diff(cv::Mat& result , const cv::Mat& old_img, const cv::Mat& new_img);
 
 /// Reduces noise by means of blurring the `target` image.
-void blur(cv::Mat& target, const blur_type type);
+void blur(cv::Mat& target, const Blur type);
 
 /// Reduces noise by checking whether pixel values on the `target` image are
 /// within `min_threshold` and `max_threshold`. Pixels having values out of
@@ -107,7 +97,7 @@ void match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl
 void patch(cv::Mat& out_mat, const cv::Mat& tpl_mat, const cv::Rect& roi);
 
 /// Find bounding boxes in `mask` (can be obtained with `diff()` followed by `threshold()`)
-void bound_boxes(bound_box_vector_t& boxes, const cv::Mat& mask,
+void bound_boxes(BoundBoxVector& boxes, const cv::Mat& mask,
     int min_threshold = THRESHOLD_MIN, int max_threshold = THRESHOLD_MAX);
 
 /// Get average of the value computed by `get_MSSIM()`

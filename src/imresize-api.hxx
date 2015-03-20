@@ -29,16 +29,8 @@ using imtools::Command;
 class ResizeCommand : public ::imtools::Command
 {
   public:
-    enum class Option : int {
-      UNKNOWN,
-      SOURCE,
-      OUTPUT,
-      WIDTH,
-      HEIGHT,
-      INTERPOLATION,
-      FX,
-      FY
-    };
+    // Inherit ctors
+    using Command::Command;
 
     ResizeCommand(const std::string& source,
         const std::string& output,
@@ -48,22 +40,11 @@ class ResizeCommand : public ::imtools::Command
         double fy,
         int interpolation) noexcept;
 
-    ResizeCommand(const element_vector_t& elements) noexcept;
-
-    ResizeCommand() = delete;
-    virtual ~ResizeCommand() {}
-    ResizeCommand(ResizeCommand const&) = delete;
-
-    // Executes the command
-    virtual void run(imtools::CommandResult& result) const;
+    /// Executes the command
+    virtual void run(imtools::CommandResult& result) override;
 
     /// \returns command-specific data serialized in a string
-    virtual std::string serialize() const noexcept;
-
-    /// Returns numeric representation of option name for comparisions.
-    virtual int getOptionCode(const std::string& o) const noexcept;
-    /// Returns numeric representation of interpolation method name
-    virtual int getInterpolationCode(const std::string& m) const noexcept;
+    virtual std::string serialize() const noexcept override;
 
   protected:
     /// Source image path
@@ -87,14 +68,31 @@ class ResizeCommand : public ::imtools::Command
 class ResizeCommandFactory : public ::imtools::CommandFactory
 {
   public:
-    ResizeCommandFactory() {}
-    ResizeCommandFactory(ResizeCommandFactory const&) {}
-    virtual ~ResizeCommandFactory() {}
+    enum class Option : int {
+      UNKNOWN,
+      SOURCE,
+      OUTPUT,
+      WIDTH,
+      HEIGHT,
+      INTERPOLATION,
+      FX,
+      FY
+    };
 
-    virtual ResizeCommand* create(const Command::element_vector_t& elements) const
-    {
-      return new ResizeCommand(elements);
-    }
+    using ::imtools::CommandFactory::CommandFactory;
+
+    virtual ResizeCommand* create(const Command::Arguments& arguments) const override;
+
+  protected:
+    /// \returns numeric representation of option name for comparisions.
+    virtual int getOptionCode(const std::string& o) const noexcept override;
+
+  private:
+    /*!
+     * \param m Interpolation method name ("area", "linear", etc.)
+     * \returns numeric representation of interpolation method name
+     */
+    static int _getInterpolationCode(const std::string& m) noexcept;
 };
 
 /////////////////////////////////////////////////////////////////////

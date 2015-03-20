@@ -22,7 +22,6 @@
 
 #include <cmath> // for isgreater()
 #include <string>
-#include <boost/algorithm/string/trim.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
@@ -30,10 +29,8 @@
 #include "exceptions.hxx"
 
 using imtools::imresize::ResizeCommand;
+using imtools::imresize::ResizeCommandFactory;
 using imtools::CommandResult;
-
-typedef ::imtools::Command::element_vector_t element_vector_t;
-typedef ::imtools::Command::element_t element_t;
 
 
 ResizeCommand::ResizeCommand(const std::string& source,
@@ -54,7 +51,7 @@ ResizeCommand::ResizeCommand(const std::string& source,
 }
 
 int
-ResizeCommand::getInterpolationCode(const std::string& m) const noexcept
+ResizeCommandFactory::_getInterpolationCode(const std::string& m) noexcept
 {
   const int DEFAULT_CODE = cv::INTER_LINEAR;
   int code;
@@ -83,33 +80,9 @@ ResizeCommand::getInterpolationCode(const std::string& m) const noexcept
 }
 
 
-ResizeCommand::ResizeCommand(const element_vector_t& elements) noexcept
-: m_width(0), m_height(0), m_fx(0.0), m_fy(0.0)
-{
-  for (auto& it : elements) {
-    std::string value = it.second.data();
-    std::string key = it.first.data();
-    Option option = static_cast<Option>(getOptionCode(key));
-
-    verbose_log("key: %s, value: %s, option: %d\n", key.c_str(), value.c_str(), option);
-
-    switch (option) {
-      case Option::SOURCE:        m_source        = value;                       break;
-      case Option::OUTPUT:        m_output        = value;                       break;
-      case Option::WIDTH:         m_width         = std::stoi(value);            break;
-      case Option::HEIGHT:        m_height        = std::stoi(value);            break;
-      case Option::FX:            m_fx            = stod(value);                 break;
-      case Option::FY:            m_fy            = stod(value);                 break;
-      case Option::INTERPOLATION: m_interpolation = getInterpolationCode(value); break;
-      default: warning_log("Skipping unknown key '%s'\n", key.c_str()); break;
-    }
-  }
-}
-
-
 /// Returns numeric representation of option name for comparisions.
 int
-ResizeCommand::getOptionCode(const std::string& o) const noexcept
+ResizeCommandFactory::getOptionCode(const std::string& o) const noexcept
 {
   Option code;
 
@@ -143,15 +116,10 @@ ResizeCommand::getOptionCode(const std::string& o) const noexcept
 
 
 void
-ResizeCommand::run(CommandResult& result) const
+ResizeCommand::run(CommandResult& result)
 {
-  auto trim_chars = boost::algorithm::is_any_of(" \t\r\n/");
-  std::string source_filename(m_allow_absolute_paths
-      ? m_source
-      : boost::algorithm::trim_left_copy_if(m_source, trim_chars));
-  std::string output_filename(m_allow_absolute_paths
-      ? m_output
-      : boost::algorithm::trim_left_copy_if(m_output, trim_chars));
+  std::string source_filename(trimPath(m_source));
+  std::string output_filename(trimPath(m_output));
 
   cv::Mat source(cv::imread(source_filename, 1));
   if (source.empty()) {
@@ -188,6 +156,42 @@ ResizeCommand::serialize() const noexcept
       << m_fx << m_fy;
 
     return ss.str();
+}
+
+
+ResizeCommand*
+ResizeCommandFactory::create(const Command::Arguments& arguments) const
+{
+  std::string source;
+  std::string output;
+  uint_t      width         = 0;
+  uint_t      height        = 0;
+  double      fx            = 0.0;
+  double      fy            = 0.0;
+  int         interpolation = cv::INTER_LINEAR;
+
+  for (auto& it : arguments) {
+    std::string key = it.first.data();
+    Command::CValuePtr value = it.second;
+
+    Option option = static_cast<Option>(getOptionCode(key));
+    auto str_value = value->getString();
+
+    verbose_log("key: %s, value: %s, option: %d\n", key.c_str(), str_value.c_str(), option);
+
+    switch (option) {
+      case Option::SOURCE:        source        = str_value;                       break;
+      case Option::OUTPUT:        output        = str_value;                       break;
+      case Option::WIDTH:         width         = std::stoi(str_value);            break;
+      case Option::HEIGHT:        height        = std::stoi(str_value);            break;
+      case Option::FX:            fx            = std::stod(str_value);            break;
+      case Option::FY:            fy            = std::stod(str_value);            break;
+      case Option::INTERPOLATION: interpolation = _getInterpolationCode(str_value); break;
+      default: warning_log("Skipping unknown key '%s'\n", key.c_str()); break;
+    }
+  }
+
+  return new ResizeCommand(source, output, width, height, fx, fy, interpolation);
 }
 
 

@@ -131,7 +131,7 @@ usage(bool is_error)
 
 
 static imtools::imserver::CommandPtr
-get_command(Command::Type type, const Command::element_vector_t& elements)
+get_command(Command::Type type, const Command::Arguments& arguments)
 {
   std::unique_ptr<CommandFactory> factory_ptr;
 
@@ -145,14 +145,16 @@ get_command(Command::Type type, const Command::element_vector_t& elements)
       break;
 
     case Command::Type::MERGE:
-      throw ErrorException("Command::Type::MERGE not implemented");
+      factory_ptr = std::unique_ptr<CommandFactory>(new imtools::immerge::MergeCommandFactory());
+      break;
 
     case Command::Type::UNKNOWN: // no break
     default:
       throw ErrorException("Unknown command code: %d", type);
   }
 
-  return imtools::imserver::CommandPtr(factory_ptr->create(elements));
+  debug_log0("Creating CommandPtr\n");
+  return imtools::imserver::CommandPtr(factory_ptr->create(arguments));
 }
 
 
@@ -316,7 +318,12 @@ Server::sendMessage(Connection conn, const std::string& message, const std::stri
     pt.put("error", (int) (type == Server::MessageType::ERROR));
     pt.put("response", message);
     pt.put("digest", digest);
-    boost::property_tree::json_parser::write_json(json_stream, pt);
+#ifdef IMTOOLS_DEBUG
+    // Pretty-print JSON
+    boost::property_tree::json_parser::write_json(json_stream, pt, true);
+#else
+    boost::property_tree::json_parser::write_json(json_stream, pt, false);
+#endif
 
     m_server.send(conn, json_stream.str(), websocketpp::frame::opcode::text, ec);
     if (ec) {
@@ -355,7 +362,7 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
   ptree pt;
   std::string error;
   std::string input_digest;
-  Command::element_vector_t elements;
+  Command::Arguments arguments;
   std::stringstream ss(msg->get_payload());
 
   try {
@@ -366,10 +373,12 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
     auto command_name = pt.get<std::string>("command");
     input_digest      = pt.get<std::string>("digest");
 
+    IMTOOLS_SERVER_OBJECT_LOG0(debug, "Started Transforming ptree values\n");
     std::transform(std::begin(pt_arg), std::end(pt_arg),
-        std::back_inserter(elements), Util::convertPtreeValue);
+        std::back_inserter(arguments), Util::convertPtreeValue);
+    IMTOOLS_SERVER_OBJECT_LOG0(debug, "Finished transforming ptree values\n");
 
-    auto command_ptr = get_command(Command::getType(command_name), elements);
+    auto command_ptr = get_command(Command::getType(command_name), arguments);
 
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Checking digest for command '%s'\n", command_name.c_str());
     if (!checkCommandDigest(*command_ptr, input_digest)) {
@@ -459,10 +468,29 @@ Util::getErrorMessage(const websocketpp::lib::error_code& ec) noexcept
 }
 
 
-Command::element_t
+Command::ArgumentItem
 Util::convertPtreeValue(const ptree::value_type& v) noexcept
 {
-  return Command::element_t(v.first.data(), v.second.data());
+  Command::Value* value_ptr;
+
+  if (v.second.size()) {
+    debug_log("Util::convertPtreeValue: key = %s, array size = %ld\n", v.first.c_str(), v.second.size());
+    Command::Value::ArrayType array;
+    array.reserve(v.second.size());
+
+    for (auto& it : v.second) {
+      if (it.second.size() == 0) {
+        debug_log("Util::convertPtreeValue: key = %s, push_back(%s)\n", v.first.c_str(), it.second.data().c_str());
+        array.push_back(it.second.data());
+      }
+    }
+
+    value_ptr = new Command::ArrayValue(array);
+  } else {
+    value_ptr = new Command::StringValue(v.second.data());
+  }
+
+  return Command::ArgumentItem(v.first.data(), Command::CValuePtr(value_ptr));
 }
 
 

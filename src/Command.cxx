@@ -15,12 +15,22 @@
  */
 
 #include <string>
+#include <utility> // for std::initializer_list()
+#include <opencv2/highgui/highgui.hpp>
+
 #include "imtools-types.hxx"
 #include "Command.hxx"
 
 using imtools::Command;
 
-Command::compression_params_t Command::s_compression_params;
+/////////////////////////////////////////////////////////////////////
+
+Command::CompressionParams Command::s_compression_params(std::initializer_list<int> {
+    CV_IMWRITE_PNG_STRATEGY, cv::IMWRITE_PNG_STRATEGY_FILTERED,
+    CV_IMWRITE_PNG_COMPRESSION, 9, // 0 - none, 9 - full
+    CV_IMWRITE_JPEG_QUALITY, 90});
+
+/////////////////////////////////////////////////////////////////////
 
 Command::Type
 Command::getType(const std::string& c)

@@ -22,6 +22,7 @@
 
 namespace imtools { namespace imresize {
 using namespace imtools;
+//////////////////////////////////////////////////////////////////////
 
 const char* g_program_name;
 
@@ -40,7 +41,7 @@ double g_fy = 0.;
 /// Interpolation method
 int g_interpolation = 0;
 
-
+//////////////////////////////////////////////////////////////////////
 /// Template for `printf`-like function.
 const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "A simple tool to make thumbnails.\n"
@@ -70,6 +71,7 @@ const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "To decimate the image by factor of 2 in each direction\n"
 "%1$s -s src.png -o out.png --fx 0.5 --fy 0.5\n";
 
+//////////////////////////////////////////////////////////////////////
 // CLI arguments.
 const char *g_short_options = "hvVs:o:W:H:X:Y:I:";
 const struct option g_long_options[] = {
@@ -86,8 +88,7 @@ const struct option g_long_options[] = {
   {0,               0,                 0,    0}
 };
 
-
+//////////////////////////////////////////////////////////////////////
 }} // namespace imtools::imresize
-
 #endif // IMTOOLS_IMRESIZE_HXX
 // vim: et ts=2 sts=2 sw=2

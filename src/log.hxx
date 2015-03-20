@@ -85,7 +85,7 @@ namespace imtools { namespace log {
 #define strict_log(is_strict, ...)       \
   do {                                   \
     if ((is_strict)) {                   \
-      throw ErrorException(__VA_ARGS__); \
+      throw imtools::ErrorException(__VA_ARGS__); \
     } else {                             \
       warning_log(__VA_ARGS__);          \
     }                                    \

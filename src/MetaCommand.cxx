@@ -24,13 +24,14 @@
 #include "exceptions.hxx"
 
 using imtools::MetaCommand;
+using imtools::MetaCommandFactory;
 using imtools::CommandResult;
 using imtools::ErrorException;
 
 /////////////////////////////////////////////////////////////////////
 
 void
-MetaCommand::run(CommandResult& result) const
+MetaCommand::run(CommandResult& result)
 {
   switch (m_subcommand) {
     case SubCommand::VERSION:
@@ -76,26 +77,8 @@ MetaCommand::serialize() const noexcept
 }
 
 
-int
-MetaCommand::getOptionCode(const std::string& o) const noexcept
-{
-  Option code;
-
-  switch (o[0]) {
-    case 's':
-      code = o == "subcommand" ? Option::SUBCOMMAND : Option::UNKNOWN;
-      break;
-    default:
-      code = Option::UNKNOWN;
-      break;
-  }
-
-  return static_cast<int>(code);
-}
-
-
 MetaCommand::SubCommand
-MetaCommand::getSubCommandCode(const std::string& name) const noexcept
+MetaCommand::getSubCommandCode(const std::string& name) noexcept
 {
   SubCommand code;
 
@@ -121,21 +104,47 @@ MetaCommand::getSubCommandCode(const std::string& name) const noexcept
 }
 
 
-MetaCommand::MetaCommand(const element_vector_t& elements) noexcept
-: m_subcommand(MetaCommand::SubCommand::UNKNOWN)
+/////////////////////////////////////////////////////////////////////
+
+int
+MetaCommandFactory::getOptionCode(const std::string& o) const noexcept
 {
-  for (auto& it : elements) {
-    std::string value = it.second.data();
+  Option code;
+
+  switch (o[0]) {
+    case 's':
+      code = o == "subcommand" ? Option::SUBCOMMAND : Option::UNKNOWN;
+      break;
+    default:
+      code = Option::UNKNOWN;
+      break;
+  }
+
+  return static_cast<int>(code);
+}
+
+
+MetaCommand*
+MetaCommandFactory::create(const Command::Arguments& arguments) const
+{
+  MetaCommand::SubCommand subcommand = MetaCommand::SubCommand::UNKNOWN;
+
+  for (auto& it : arguments) {
     std::string key = it.first.data();
+    Command::CValuePtr value = it.second;
+
+    std::string str_value = value->getString();
     Option option = static_cast<Option>(getOptionCode(key));
 
-    verbose_log("key: %s, value: %s, option: %d\n", key.c_str(), value.c_str(), option);
+    verbose_log("key: %s, value: %s, option: %d\n", key.c_str(), str_value.c_str(), option);
 
     switch (option) {
-      case Option::SUBCOMMAND: m_subcommand = getSubCommandCode(value); break;
+      case Option::SUBCOMMAND: subcommand = MetaCommand::getSubCommandCode(str_value); break;
       default: warning_log("Skipping unknown key '%s'\n", key.c_str()); break;
     }
   }
+
+  return new MetaCommand(subcommand);
 }
 
 // vim: et ts=2 sts=2 sw=2

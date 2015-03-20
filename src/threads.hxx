@@ -17,7 +17,11 @@
 #ifndef IMTOOLS_THREADS_HXX
 #define IMTOOLS_THREADS_HXX
 #ifdef IMTOOLS_THREADS
+#ifndef USE_OPENMP
+# error "OpenMP required"
+#endif
 #include <omp.h>
+#include <thread> // std::thread::hardware_concurrency()
 // OmpGuard is not the fastest way to lock in OpenMP. The `critical` sections
 // are faster, for instance. However, OmpGuard is exception-safe (unlike
 // `critical` sections). Plus we are using for debug/verbose/error messages
@@ -40,6 +44,15 @@ typedef omp_lock_t it_lock_t;
 extern it_lock_t io_lock;
 
 it_thread_id_t get_id() noexcept;
+
+/////////////////////////////////////////////////////////////////////
+
+/// Returns number of concurrent threads supported.
+inline unsigned
+max_threads()
+{
+  return std::thread::hardware_concurrency();
+}
 
 /////////////////////////////////////////////////////////////////////
 class OmpGuard

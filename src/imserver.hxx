@@ -28,7 +28,11 @@
 
 #include "MetaCommand.hxx"
 #include "imresize-api.hxx"
+#include "immerge-api.hxx"
 #include "imtools-meta.hxx"
+#ifdef IMTOOLS_DEBUG
+#include "log.hxx"
+#endif
 
 
 namespace imtools { namespace imserver {
@@ -83,8 +87,8 @@ class Util
     Util() = delete;
 
     static const char* getErrorMessage(const websocketpp::lib::error_code& ec) noexcept;
-    /// Unary operation for std::transform(). Converts property tree value to Command::element_t.
-    static Command::element_t convertPtreeValue(const boost::property_tree::ptree::value_type& v) noexcept;
+    /// Unary operation for std::transform(). Converts property tree value to Command::ArgumentItem.
+    static Command::ArgumentItem convertPtreeValue(const boost::property_tree::ptree::value_type& v) noexcept;
     /// \returns SHA-1 digest for `source` in hexadecimal format
     static std::string makeSHA1(const std::string& source) noexcept;
 };
@@ -204,7 +208,15 @@ class Server : public std::enable_shared_from_this<Server>
     /// \returns whether `digest` corresponds to the `command`
     virtual inline bool checkCommandDigest(const imtools::Command& command, const std::string& digest) const noexcept
     {
+#ifdef IMTOOLS_DEBUG
+      std::string true_digest(Util::makeSHA1(getAppName() + command.serialize() + getPrivateKey()));
+      debug_log("input digest: %s true digest: %s (%s + %s + %s)\n",
+          digest.c_str(), true_digest.c_str(),
+          getAppName().c_str(), command.serialize().c_str(), getPrivateKey().c_str());
+      return (digest == true_digest);
+#else
       return (digest == Util::makeSHA1(getAppName() + command.serialize() + getPrivateKey()));
+#endif
     }
 
     /// Configuration of an application

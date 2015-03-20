@@ -163,6 +163,51 @@ The message digest should be built by formula:
     }
 
 
+*Request format for `merge` command*
+
+    {
+      "command"    : "merge",
+      "arguments": { ... },
+      "digest"     : "(SHA-1)"
+    }
+
+Supported arguments:
+- `old_image` - required; old image
+- `new_image` - required; new image
+- `input_images` - required; array of input images
+- `output_images` - required; array of output images (size must be equal to size of `input_images`)
+- `strict` - optional; value > 0 turns some warnings into fatal errors
+- `out_dir` - output directory; default : `'.'`
+- `min_threshold` - Min. noise suppression threshold (see `immerge -h`)
+- `max_threshold` - Max. noise suppression threshold (see `immerge -h`)
+
+*Example meta request*
+
+    {
+      "command": "merge",
+      "arguments": {
+        "old_image": "old.jpg",
+        "new_image": "new.jpg",
+        "input_images": [
+          "in.jpg"
+        ],
+        "output_images": [
+          "out.jpg"
+        ],
+        "strict": 2
+      },
+      "digest": "f6bca39b56b85cac90398b69e2b10378591508c2"
+    }
+
+
+where `digest` is computed as
+
+    sha1(application_name + old_image + new_image + out_dir + size(output_images)
+        + strict + private_key)
+       = sha1('application_1' + 'old.jpg' + 'new.jpg' + '.' + '1' + '2' + 'yeBOfetLDTkP')
+       = 'f6bca39b56b85cac90398b69e2b10378591508c2'
+
+
 [Nginx](http://nginx.org) configuration:
 
     location /websocket {

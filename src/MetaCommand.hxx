@@ -31,11 +31,6 @@ using imtools::Command;
 class MetaCommand : public Command
 {
   public:
-    enum class Option : int {
-      UNKNOWN,
-      SUBCOMMAND
-    };
-
     enum class SubCommand : int {
       UNKNOWN,
       VERSION,
@@ -44,25 +39,22 @@ class MetaCommand : public Command
       ALL
     };
 
-    virtual ~MetaCommand() {}
-    MetaCommand(const element_vector_t& elements) noexcept;
-    MetaCommand() = delete;
-    MetaCommand(MetaCommand const&) = delete;
+    // Inherit ctors
+    using Command::Command;
+    explicit MetaCommand(SubCommand subcommand) : m_subcommand(subcommand) {};
 
     // Executes the command
-    virtual void run(CommandResult& result) const;
+    virtual void run(CommandResult& result) override;
 
     /// \returns command-specific data serialized in a string
     virtual std::string serialize() const noexcept;
 
-  protected:
-    /// Returns numeric representation of option name for comparisions.
-    virtual int getOptionCode(const std::string& o) const noexcept;
-
     /// Returns numeric representation of subcommand name for comparisions.
-    virtual SubCommand getSubCommandCode(const std::string& name) const noexcept;
+    static SubCommand getSubCommandCode(const std::string& name) noexcept;
 
+  protected:
     SubCommand m_subcommand;
+
   private:
     std::string _getName(const MetaCommand::SubCommand& code) const;
 };
@@ -71,14 +63,18 @@ class MetaCommand : public Command
 class MetaCommandFactory : public ::imtools::CommandFactory
 {
   public:
-    MetaCommandFactory() {}
-    MetaCommandFactory(MetaCommandFactory const&) {}
-    virtual ~MetaCommandFactory() {}
+    enum class Option : int {
+      UNKNOWN,
+      SUBCOMMAND
+    };
 
-    virtual MetaCommand* create(const Command::element_vector_t& elements) const
-    {
-      return new MetaCommand(elements);
-    }
+    using ::imtools::CommandFactory::CommandFactory;
+
+    virtual MetaCommand* create(const Command::Arguments& elements) const override;
+
+  protected:
+    /// Returns numeric representation of option name for comparisions.
+    virtual int getOptionCode(const std::string& o) const noexcept;
 };
 
 /////////////////////////////////////////////////////////////////////

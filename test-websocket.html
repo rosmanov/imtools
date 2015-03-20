@@ -1,6 +1,16 @@
 <html>
   <head>
-    <title>WebSocket Echo Test</title>
+    <title>WebSocket Server Test</title>
+    <style>
+      #output {
+        word-wrap: break-word;
+        width: 800px;
+        background: #222222;
+        color: #e0e0e0;
+        min-height: 100px;
+        padding: 2px 5px;
+      }
+    </style>
     <script>
     function init() {
       var uri = "ws://127.0.0.1:9809";
@@ -10,7 +20,7 @@
         document.getElementById("output").innerHTML += "<p>&gt; CONNECTED to " + uri + "</p>";
       };
       websocket.onmessage = function(evt) {
-        document.getElementById("output").innerHTML += "<p style='color: blue;'>&gt; RESPONSE: " + evt.data + "</p>";
+        document.getElementById("output").innerHTML += "<p style='color: rgb(151, 213, 151);'>&gt; RESPONSE: " + evt.data + "</p>";
       };
       websocket.onerror = function(evt) {
         var msg;
@@ -31,8 +41,8 @@
     }
 
     function sendMessage(message) {
+      if (typeof message == 'object') message = JSON.stringify(message, null, '  ');
       document.getElementById("output").innerHTML += "<p>&gt; SENT: " + message + "</p>";
-      if (typeof message == 'object') message = JSON.stringify(message);
       websocket.send(message);
     }
     window.addEventListener("load", init, false);
@@ -41,33 +51,62 @@
   <body>
     <b>Message to send:</b>
     <input onkeypress="if(this.value) {if (window.event.keyCode == 13) { sendMessage(this.value); this.value = null; }}"/>
+    <!--
+    
+      digest = sha1(application_name + source + output + width + height + fx + fy + private_key)
+      = sha1('application_1' + 'image.png' + 'thumbnail.png' + '0' + '0' + '0.5' + '0.5' + 'yeBOfetLDTkP')
+      = 2b230f4d60c30f5553bc1deb56ca8cecd3a486d0;
+
+    -->
     <input type="button" name="b" id="b" value="test resize"
     onclick="sendMessage({
       command: 'resize',
       arguments:{
-        'source':'/image.png',
-        'output':'/thumbnail.png',
+        'source':'image.png',
+        'output':'thumbnail.png',
         'interpolation':'area',
         'fx' : 0.5,
         'fy' : 0.5,
         'verbose': 1
       },
-      digest: '757fbf76324d533fb9facad748312ac9fbf326b6'
+      digest: '2b230f4d60c30f5553bc1deb56ca8cecd3a486d0'
     })" />
 
-    <input type="button" name="b" id="b" value="test meta/version"
+    <input type="button" name="" id="" value="test meta/version"
     onclick="sendMessage({
       command: 'meta',
       arguments: { subcommand: 'version' },
       digest: 'c66b55ed158b157e2559f81554de3237c20831a3'
     })" />
 
-    <input type="button" name="b" id="b" value="test meta/version"
+    <input type="button" name="" id="" value="test meta/all"
     onclick="sendMessage({
       command: 'meta',
       arguments: { subcommand: 'all' },
       digest: '2b1ca5f60c490a147e808699f438b601acf1ca89'
     })" />
-    <div id="output"></div>
+
+    <!--
+      CLI command: immerge -ss -vvv -o old.jpg -n new.jpg out_np.jpg
+
+      digest = sha1(application_name + old_image + new_image + out_dir + size(output_images) + strict + private_key),
+      where out_dir = '.' by default, strict is integer equal to zero by default. So
+      digest = sha1('application_1' + 'old.jpg' + 'new.jpg' + '.' + '1' + '2' + 'yeBOfetLDTkP')
+        = 'f6bca39b56b85cac90398b69e2b10378591508c2'
+    -->
+    <input type="button" name="" id="" value="test merge"
+    onclick="sendMessage({
+      command: 'merge',
+      arguments: {
+        old_image: 'old.jpg',
+        new_image: 'new.jpg',
+        input_images: [ 'in.jpg' ],
+        output_images: [ 'out.jpg' ],
+        strict: 2,
+      },
+      digest: 'f6bca39b56b85cac90398b69e2b10378591508c2'
+    })" />
+
+    <pre id="output" style=""></pre>
   </body>
 </html>
