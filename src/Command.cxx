@@ -32,7 +32,13 @@ Command::getType(const std::string& c)
       code = c == "resize" ? Command::Type::RESIZE : Command::Type::UNKNOWN;
       break;
     case 'm':
-      code = c == "merge"  ? Command::Type::MERGE  : Command::Type::UNKNOWN;
+      if (c == "meta") {
+        code = Command::Type::META;
+      } else if (c == "merge") {
+        code = Command::Type::MERGE;
+      } else {
+        code = Command::Type::UNKNOWN;
+      }
       break;
     default:
       code = Command::Type::UNKNOWN;

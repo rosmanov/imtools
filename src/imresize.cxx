@@ -24,6 +24,7 @@
 #include "opencv2/imgproc/imgproc.hpp"
 
 using namespace imtools::imresize;
+using imtools::CommandResult;
 
 typedef ::imtools::imresize::Command Command;
 
@@ -138,7 +139,8 @@ main(int argc, char **argv)
   try {
     ResizeCommand cmd(g_source_image_filename, g_output_image_filename,
         g_width, g_height, g_fx, g_fy, g_interpolation);
-    cmd.run();
+    CommandResult result;
+    cmd.run(result);
   } catch (ErrorException& e) {
     error_log("%s\n", e.what());
     exit_code = 1;

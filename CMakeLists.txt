@@ -107,7 +107,7 @@ endforeach()
 
 if (IMTOOLS_SERVER)
   add_definitions(-DIMTOOLS_SERVER)
-  add_executable(imserver ${common_src} src/Command.cxx ${src_api_list} src/imserver.cxx)
+  add_executable(imserver ${common_src} src/Command.cxx src/MetaCommand.cxx ${src_api_list} src/imserver.cxx)
   target_link_libraries(imserver ${LIBS})
   list(APPEND imtools_targets imserver)
 endif (IMTOOLS_SERVER)

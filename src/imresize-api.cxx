@@ -30,6 +30,7 @@
 #include "exceptions.hxx"
 
 using imtools::imresize::ResizeCommand;
+using imtools::CommandResult;
 
 typedef ::imtools::Command::element_vector_t element_vector_t;
 typedef ::imtools::Command::element_t element_t;
@@ -142,7 +143,7 @@ ResizeCommand::getOptionCode(const std::string& o) const noexcept
 
 
 void
-ResizeCommand::run() const
+ResizeCommand::run(CommandResult& result) const
 {
   auto trim_chars = boost::algorithm::is_any_of(" \t\r\n/");
   std::string source_filename(m_allow_absolute_paths
@@ -172,6 +173,8 @@ ResizeCommand::run() const
   if (!cv::imwrite(output_filename, output, getCompressionParams())) {
     throw FileWriteErrorException(output_filename);
   }
+
+  result.setValue("OK");
 }
 
 

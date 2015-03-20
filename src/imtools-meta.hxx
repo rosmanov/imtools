@@ -43,5 +43,38 @@
 #define IMTOOLS_COPYRIGHT "Copyright (C) 2014,2015 - Ruslan Osmanov <rrosmanov@gmail.com>"
 
 /////////////////////////////////////////////////////////////////////
+// Features
+
+#ifdef IMTOOLS_THREADS_BACKEND
+# define IMTOOLS_THREADS_FEATURE IMTOOLS_THREADS_BACKEND
+#else
+# define IMTOOLS_THREADS_FEATURE "Non-threaded"
+#endif
+
+#ifdef IMTOOLS_EXTRA
+# define IMTOOLS_EXTRA_FEATURE "ExtraTools"
+#else
+# define IMTOOLS_EXTRA_FEATURE ""
+#endif
+
+#ifdef IMTOOLS_DEBUG
+# define IMTOOLS_DEBUG_FEATURE "Debug"
+#else
+# define IMTOOLS_DEBUG_FEATURE "NoDebug"
+#endif
+
+#ifdef IMTOOLS_DEBUG_PROFILER
+# define IMTOOLS_DEBUG_PROFILER_FEATURE "DebugProfiler"
+#else
+# define IMTOOLS_DEBUG_PROFILER_FEATURE "NoDebugProfiler"
+#endif
+
+#define IMTOOLS_FEATURES \
+  IMTOOLS_THREADS_FEATURE " " \
+  IMTOOLS_EXTRA_FEATURE " " \
+  IMTOOLS_DEBUG_FEATURE " " \
+  IMTOOLS_DEBUG_PROFILER_FEATURE
+
+/////////////////////////////////////////////////////////////////////
 #endif // IMTOOLS_HXX
 // vim: et ts=2 sts=2 sw=2

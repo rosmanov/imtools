@@ -41,7 +41,7 @@
   <body>
     <b>Message to send:</b>
     <input onkeypress="if(this.value) {if (window.event.keyCode == 13) { sendMessage(this.value); this.value = null; }}"/>
-    <input type="button" name="b" id="b" value="send object"
+    <input type="button" name="b" id="b" value="test resize"
     onclick="sendMessage({
       command: 'resize',
       arguments:{
@@ -53,6 +53,20 @@
         'verbose': 1
       },
       digest: '757fbf76324d533fb9facad748312ac9fbf326b6'
+    })" />
+
+    <input type="button" name="b" id="b" value="test meta/version"
+    onclick="sendMessage({
+      command: 'meta',
+      arguments: { subcommand: 'version' },
+      digest: 'c66b55ed158b157e2559f81554de3237c20831a3'
+    })" />
+
+    <input type="button" name="b" id="b" value="test meta/version"
+    onclick="sendMessage({
+      command: 'meta',
+      arguments: { subcommand: 'all' },
+      digest: '2b1ca5f60c490a147e808699f438b601acf1ca89'
     })" />
     <div id="output"></div>
   </body>

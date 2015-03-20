@@ -26,6 +26,7 @@
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 
+#include "MetaCommand.hxx"
 #include "imresize-api.hxx"
 #include "imtools-meta.hxx"
 
@@ -198,9 +199,10 @@ class Server : public std::enable_shared_from_this<Server>
     typedef std::set<Connection, std::owner_less<Connection>> ConnectionList;
 
     /// Sends response message to the client.
-    virtual void sendMessage(Connection conn, const std::string& message, MessageType type) noexcept;
+    virtual void sendMessage(Connection conn, const std::string& message, const std::string& digest, MessageType type) noexcept;
 
-    virtual inline bool checkCommandDigest(const imtools::Command& command, const std::string& digest) const
+    /// \returns whether `digest` corresponds to the `command`
+    virtual inline bool checkCommandDigest(const imtools::Command& command, const std::string& digest) const noexcept
     {
       return (digest == Util::makeSHA1(getAppName() + command.serialize() + getPrivateKey()));
     }

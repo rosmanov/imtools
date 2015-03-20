@@ -55,7 +55,7 @@ class ResizeCommand : public ::imtools::Command
     ResizeCommand(ResizeCommand const&) = delete;
 
     // Executes the command
-    virtual void run() const;
+    virtual void run(imtools::CommandResult& result) const;
 
     /// \returns command-specific data serialized in a string
     virtual std::string serialize() const noexcept;

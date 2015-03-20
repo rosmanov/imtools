@@ -59,6 +59,7 @@ namespace imtools {
 /// Bounding boxes having smaller area will be merged together by means of morphological operations.
 const int MIN_BOUND_BOX_AREA = 2800;
 
+
 /// Verbose mode for CLI output:
 /// - 0 - off
 /// - 1 - verbose
@@ -79,6 +80,7 @@ max_threads()
 
 bool file_exists(const char* filename);
 bool file_exists(const std::string& filename);
+const char* get_features();
 
 /// Computes difference between two image matrices.
 ///

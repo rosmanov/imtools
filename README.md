@@ -134,6 +134,35 @@ error message on error, e.g.:
     {"error":"0","response":"OK"}
 
 
+*Request format for `meta` command*
+
+    {
+      "command"    : "meta",
+      "subcommand" : "(subcommand name)",
+      "digest"     : ""
+    }
+
+Possible `subcommand` values:
+- `"version"` - request version full name
+- `"features"` - ImTools features
+- `"copyright"` - copyright string
+- `"all"` - `"version"`, `"features"` and `"copyright"` separated by new line.
+
+The message digest should be built by formula:
+
+    digest = SHA1(application_name + "version" + key)
+
+*Example meta request*
+
+    {
+      "command"    : "meta",
+      "arguments"  : {
+        "subcommand" : "version"
+      },
+      "digest"     : "c66b55ed158b157e2559f81554de3237c20831a3"
+    }
+
+
 [Nginx](http://nginx.org) configuration:
 
     location /websocket {

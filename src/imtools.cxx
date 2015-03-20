@@ -23,6 +23,7 @@ namespace imtools {
 
 uint_t verbose = 0;
 
+/////////////////////////////////////////////////////////////////////
 
 bool
 file_exists(const char* filename)
@@ -44,22 +45,7 @@ print_version()
 {
   printf("Version: " IMTOOLS_FULL_NAME "\n"
       "Copyright: " IMTOOLS_COPYRIGHT "\n"
-      "Features:"
-#ifdef IMTOOLS_THREADS_BACKEND
-      " " IMTOOLS_THREADS_BACKEND
-#else
-      " Non-threaded"
-#endif
-#ifdef IMTOOLS_EXTRA
-      " ExtraTools"
-#endif
-#ifdef IMTOOLS_DEBUG
-      " Debug"
-#endif
-#ifdef IMTOOLS_DEBUG_PROFILER
-      " DebugProfiler"
-#endif
-      "\n\n");
+      "Features: %s\n\n", IMTOOLS_FEATURES);
 }
 
 

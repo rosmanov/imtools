@@ -20,8 +20,16 @@
 #include <iosfwd>
 #include <utility> // for std::pair
 #include <vector>
+#include <memory>
+
+//#include "exceptions.hxx"
+//using imtools::ErrorException;
 
 namespace imtools {
+
+
+class CommandResult;
+
 /////////////////////////////////////////////////////////////////////
 /// Base class for API command classes
 class Command
@@ -45,7 +53,7 @@ class Command
     };
 
     /// Executes command.
-    virtual void run() const = 0;
+    virtual void run(CommandResult& result) const = 0;
 
     /// \param o option name
     /// \returns numeric representation of option name for comparisions.
@@ -58,7 +66,7 @@ class Command
     /// \returns numeric representation of command name for comparisions.
     static Type getType(const std::string& c);
 
-    static const compression_params_t getCompressionParams()
+    static const compression_params_t getCompressionParams() noexcept
     {
       return s_compression_params;
     }
@@ -73,6 +81,7 @@ class Command
 
 };
 
+
 /////////////////////////////////////////////////////////////////////
 class CommandFactory
 {
@@ -81,6 +90,25 @@ class CommandFactory
     virtual Command* create(const Command::element_vector_t& elements) const = 0;
 };
 
+
+/////////////////////////////////////////////////////////////////////
+// Base class for final/intermediate result of a command
+class CommandResult
+{
+  public:
+    CommandResult() {}
+    CommandResult(const CommandResult&) = delete;
+    CommandResult& operator=(const CommandResult&) = delete;
+
+    inline void setValue(const std::string& value) noexcept { m_value = value; }
+    inline std::string getValue() const noexcept { return m_value; }
+
+    operator bool() const noexcept { return !m_value.empty(); }
+    operator std::string() const noexcept { return m_value; }
+
+  protected:
+    std::string m_value;
+};
 
 /////////////////////////////////////////////////////////////////////
 } // namespace imtools

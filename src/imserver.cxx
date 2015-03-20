@@ -46,6 +46,7 @@
 using imtools::ErrorException;
 using imtools::Command;
 using imtools::CommandFactory;
+using imtools::CommandResult;
 
 using imtools::imserver::g_server;
 using imtools::imserver::Config;
@@ -136,7 +137,7 @@ get_command(Command::Type type, const Command::element_vector_t& elements)
 
   switch (type) {
     case Command::Type::META:
-      throw ErrorException("Command::Type::META not implemented");
+      factory_ptr = std::unique_ptr<CommandFactory>(new imtools::MetaCommandFactory());
       break;
 
     case Command::Type::RESIZE:
@@ -303,7 +304,7 @@ Server::stop()
 
 
 void
-Server::sendMessage(Connection conn, const std::string& message, MessageType type) noexcept
+Server::sendMessage(Connection conn, const std::string& message, const std::string& digest, MessageType type) noexcept
 {
   ptree pt;
 
@@ -311,9 +312,10 @@ Server::sendMessage(Connection conn, const std::string& message, MessageType typ
     std::stringstream json_stream;
     websocketpp::lib::error_code ec;
 
-    // Generate JSON: {"error" : (int), "response" : "(string)"}
+    // Generate JSON: {"error" : (int), "response" : "(string)", "digest" : "(string)"}
     pt.put("error", (int) (type == Server::MessageType::ERROR));
     pt.put("response", message);
+    pt.put("digest", digest);
     boost::property_tree::json_parser::write_json(json_stream, pt);
 
     m_server.send(conn, json_stream.str(), websocketpp::frame::opcode::text, ec);
@@ -351,50 +353,53 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
   WebSocketServer::connection_ptr con = m_server.get_con_from_hdl(conn);
 
   ptree pt;
-  ptree pt_arg;
+  std::string error;
+  std::string input_digest;
+  Command::element_vector_t elements;
   std::stringstream ss(msg->get_payload());
-  std::string message;
 
   try {
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Parsing JSON: %s\n", ss.str().c_str());
     boost::property_tree::json_parser::read_json(ss, pt);
 
-    Command::element_vector_t elements;
-    pt_arg = pt.get_child("arguments");
+    auto pt_arg       = pt.get_child("arguments");
+    auto command_name = pt.get<std::string>("command");
+    input_digest      = pt.get<std::string>("digest");
+
     std::transform(std::begin(pt_arg), std::end(pt_arg),
         std::back_inserter(elements), Util::convertPtreeValue);
 
-    auto command_name = pt.get<std::string>("command");
     auto command_ptr = get_command(Command::getType(command_name), elements);
 
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Checking digest for command '%s'\n", command_name.c_str());
-    if (!checkCommandDigest(*command_ptr, pt.get<std::string>("digest"))) {
-      sendMessage(conn, "Invalid digest", Server::MessageType::ERROR);
-      return;
+    if (!checkCommandDigest(*command_ptr, input_digest)) {
+      throw ErrorException("Invalid digest");
     }
 
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Running command: '%s'\n", command_name.c_str());
     command_ptr->setAllowAbsolutePaths(getAllowAbsolutePaths());
-    command_ptr->run();
+    CommandResult result;
+    command_ptr->run(result);
+
+    if (result) {
+      sendMessage(conn, result, input_digest, Server::MessageType::SUCCESS);
+      return;
+    }
+
+    error = "Empty result";
   } catch (boost::property_tree::json_parser_error& e) {
-    message = std::string("Invalid JSON: ") + e.what();
+    error = std::string("Invalid JSON: ") + e.what();
     error_log("Failed to parse json: %s, input: %s\n", e.what(), ss.str().c_str());
   } catch (ErrorException& e) {
-    message = std::string("Fatal error: ") + e.what();
-    error_log("%s\n", message.c_str());
+    error = std::string("Fatal error: ") + e.what();
+    error_log("%s\n", error.c_str());
   } catch (...) {
-    message = "Internal Server Error";
+    error = "Internal Server Error";
     error_log("Unknown error in '%s'!!! Please file a bug.\n", __func__);
   }
 
-  if (message.empty()) {
-    debug_log0("sending success message\n");
-    message = "OK";
-    sendMessage(conn, message, Server::MessageType::SUCCESS);
-  } else {
-    debug_log("sending error message: %s\n", message.c_str());
-    sendMessage(conn, message, Server::MessageType::ERROR);
-  }
+  debug_log("sending error message: %s\n", error.c_str());
+  sendMessage(conn, error, input_digest, Server::MessageType::ERROR);
 }
 
 
@@ -481,9 +486,9 @@ Util::makeSHA1(const std::string& source) noexcept
   unsigned char hash[20];
   websocketpp::sha1::calc(source.c_str(), source.length(), hash);
 
-  oss << std::hex << std::setfill('0') << std::setw(sizeof(hash[0]) * 2);
+  oss << std::hex << std::setfill('0');
   for (const unsigned char* ptr = hash; ptr < hash + 20; ptr++) {
-    oss << (unsigned int) *ptr;
+    oss << std::setw(2) << (unsigned int) *ptr;
   }
 #endif
 
