@@ -49,7 +49,7 @@ main(int argc, char **argv)
   setvbuf(stdout, NULL, _IONBF, 0); // turn off buffering
 #endif
 
-  debug_log0("Parsing CLI args\n");
+  debug_log0("Parsing CLI args");
   try {
     do {
       next_option = getopt_long(argc, argv, g_short_options, g_long_options, NULL);
@@ -118,13 +118,13 @@ main(int argc, char **argv)
           exit(2);
 
         default:
-          error_log("getopt returned character code 0%o\n", next_option);
+          error_log("getopt returned character code 0%o", next_option);
           usage(true);
           exit(2);
       }
     } while (next_option != -1);
   } catch (imtools::InvalidCliArgException& e) {
-    error_log("%s\n", e.what());
+    error_log("%s", e.what());
     exit(2);
   }
 
@@ -132,9 +132,9 @@ main(int argc, char **argv)
     g_interpolation = cv::INTER_LINEAR;
   }
 
-  debug_log("Source image: %s\n",      g_source_image_filename.c_str());
-  debug_log("Output image: %s\n",      g_output_image_filename.c_str());
-  debug_log("Thumbnail size: %ux%u\n", g_width, g_height);
+  debug_log("Source image: %s",      g_source_image_filename.c_str());
+  debug_log("Output image: %s",      g_output_image_filename.c_str());
+  debug_log("Thumbnail size: %ux%u", g_width, g_height);
 
   try {
     ResizeCommand cmd(g_source_image_filename, g_output_image_filename,
@@ -142,10 +142,10 @@ main(int argc, char **argv)
     CommandResult result;
     cmd.run(result);
   } catch (ErrorException& e) {
-    error_log("%s\n", e.what());
+    error_log("%s", e.what());
     exit_code = 1;
   } catch (cv::Exception& e) {
-    error_log("CV error: %s\n", e.what());
+    error_log("CV error: %s", e.what());
     exit_code = 1;
   } catch (...) {
     error_log("Unknown error!!! Please file a bug.\n");

@@ -35,18 +35,18 @@
 
 /////////////////////////////////////////////////////////////////////
 
-#define save_int_opt_arg(__arg, ...)                                        \
-{                                                                           \
+#define save_int_opt_arg(__arg, ...)                                          \
+{                                                                             \
   (__arg) = optarg ? ::imtools::get_opt_arg<int>(optarg, __VA_ARGS__) : 0;    \
 }
 
-#define save_uint_opt_arg(__arg, ...)                                       \
-{                                                                           \
+#define save_uint_opt_arg(__arg, ...)                                         \
+{                                                                             \
   (__arg) = optarg ? ::imtools::get_opt_arg<uint_t>(optarg, __VA_ARGS__) : 0; \
 }
 
-#define save_double_opt_arg(__arg, ...)                                     \
-{                                                                           \
+#define save_double_opt_arg(__arg, ...)                                       \
+{                                                                             \
   (__arg) = optarg ? ::imtools::get_opt_arg<double>(optarg, __VA_ARGS__) : 0; \
 }
 

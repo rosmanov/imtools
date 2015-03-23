@@ -130,7 +130,7 @@ ResizeCommand::run(CommandResult& result)
   if ((m_width > 0 && m_height > 0)
       || (std::isgreater(m_fx, 0.0) && std::isgreater(m_fy, 0.0)))
   {
-    debug_log("cv::resize(s, o, size(%d, %d), %f, %f, %i)\n",
+    debug_log("cv::resize(s, o, size(%d, %d), %f, %f, %i)",
         m_width, m_height, m_fx, m_fy, m_interpolation);
     cv::resize(source, output, cv::Size(m_width, m_height), m_fx, m_fy, m_interpolation);
   } else {
@@ -177,7 +177,7 @@ ResizeCommandFactory::create(const Command::Arguments& arguments) const
     Option option = static_cast<Option>(getOptionCode(key));
     auto str_value = value->getString();
 
-    verbose_log("key: %s, value: %s, option: %d\n", key.c_str(), str_value.c_str(), option);
+    verbose_log("key: %s, value: %s, option: %d", key.c_str(), str_value.c_str(), option);
 
     switch (option) {
       case Option::SOURCE:        source        = str_value;                       break;
@@ -187,7 +187,7 @@ ResizeCommandFactory::create(const Command::Arguments& arguments) const
       case Option::FX:            fx            = std::stod(str_value);            break;
       case Option::FY:            fy            = std::stod(str_value);            break;
       case Option::INTERPOLATION: interpolation = _getInterpolationCode(str_value); break;
-      default: warning_log("Skipping unknown key '%s'\n", key.c_str()); break;
+      default: warning_log("Skipping unknown key '%s'", key.c_str()); break;
     }
   }
 

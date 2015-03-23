@@ -84,7 +84,7 @@ load_images(const int argc, char** argv)
 
         // Input file
         if (!file_exists(filename)) {
-          strict_log(g_strict, "image %s doesn't exist.\n", filename);
+          strict_log(g_strict, "image %s doesn't exist.", filename);
           break;
         }
         g_input_images.push_back(filename);
@@ -96,7 +96,7 @@ load_images(const int argc, char** argv)
 
     // Check if the number of input files matches the number of output files
     if (g_input_images.size() && g_input_images.size() != g_out_images.size()) {
-      strict_log(g_strict, "%s file have no pair! Skipping.\n", g_input_images.back().c_str());
+      strict_log(g_strict, "%s file have no pair! Skipping.", g_input_images.back().c_str());
       g_input_images.pop_back();
     }
   } else { // `argv` is a list of output files
@@ -109,7 +109,7 @@ load_images(const int argc, char** argv)
 
       const char* const filename = argv[optind++];
       if (!file_exists(filename)) {
-        strict_log(g_strict, "image %s doesn't exist.\n", filename);
+        strict_log(g_strict, "image %s doesn't exist.", filename);
         break;
       }
       g_input_images.push_back(filename);
@@ -143,7 +143,7 @@ main(int argc, char **argv)
   setvbuf(stdout, NULL, _IONBF, 0); // turn off buffering
 #endif
 
-  debug_log0("Parsing CLI args\n");
+  debug_log0("Parsing CLI args");
   try {
     do {
       next_option = getopt_long(argc, argv, g_short_options, g_long_options, NULL);
@@ -227,23 +227,23 @@ main(int argc, char **argv)
           exit(2);
 
         default:
-          error_log("getopt returned character code 0%o\n", next_option);
+          error_log("getopt returned character code 0%o", next_option);
           usage(true);
           exit(2);
       }
     } while (next_option != -1);
   } catch (imtools::InvalidCliArgException& e) {
-    error_log("%s\n", e.what());
+    error_log("%s", e.what());
     exit(2);
   }
 
-  debug_log("out-dir: %s\n",         g_out_dir.c_str());
-  debug_log("pairs: %d\n",           (int) g_pairs);
-  debug_log("strict: %d\n",          (int) g_strict);
-  debug_log("min-threshold: %d\n",   g_min_threshold);
-  debug_log("max-threshold: %d\n",   g_max_threshold);
+  debug_log("out-dir: %s",         g_out_dir.c_str());
+  debug_log("pairs: %d",           (int) g_pairs);
+  debug_log("strict: %d",          (int) g_strict);
+  debug_log("min-threshold: %d",   g_min_threshold);
+  debug_log("max-threshold: %d",   g_max_threshold);
 #ifdef IMTOOLS_THREADS
-  debug_log("max-threads: %d\n",     g_max_threads);
+  debug_log("max-threads: %d",     g_max_threads);
 #endif
 
   try {
@@ -252,10 +252,10 @@ main(int argc, char **argv)
     load_images(argc, argv);
     debug_timer_end(t1, t2, load_images());
 
-    debug_log("input_images size: %ld\n", g_input_images.size());
-    debug_log("out_images size: %ld\n",   g_out_images.size());
-    debug_log("new image filename: %s\n", g_new_image_filename.c_str());
-    debug_log("old image filename: %s\n", g_old_image_filename.c_str());
+    debug_log("input_images size: %ld", g_input_images.size());
+    debug_log("out_images size: %ld",   g_out_images.size());
+    debug_log("new image filename: %s", g_new_image_filename.c_str());
+    debug_log("old image filename: %s", g_old_image_filename.c_str());
 
     MergeCommand cmd(g_input_images,
         g_out_images,
@@ -272,10 +272,10 @@ main(int argc, char **argv)
       exit_code = 1;
     }
   } catch (ErrorException& e) {
-    error_log("%s\n", e.what());
+    error_log("%s", e.what());
     exit_code = 1;
   } catch (cv::Exception& e) {
-    error_log("CV error: %s\n", e.what());
+    error_log("CV error: %s", e.what());
     exit_code = 1;
   } catch (...) {
     error_log("Unknown error!!! Please file a bug.\n");

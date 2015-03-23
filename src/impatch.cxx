@@ -131,7 +131,7 @@ int main(int argc, char **argv)
         usage(true);
 
       default:
-        error_log("getopt returned character code 0%o\n", next_option);
+        error_log("getopt returned character code 0%o", next_option);
         usage(true);
     }
   } while (next_option != -1);
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
     while (optind < argc) {
       const char *filename = argv[optind++];
       if (!imtools::file_exists(filename)) {
-        error_log("image %s doesn't exist.\n", filename);
+        error_log("image %s doesn't exist.", filename);
         break;
       }
       g_dst_images.push_back(filename);
@@ -153,7 +153,7 @@ int main(int argc, char **argv)
   try {
     patch();
   } catch (cv::Exception& e) {
-    error_log("%s\n", e.what());
+    error_log("%s", e.what());
     return 1;
   }
 

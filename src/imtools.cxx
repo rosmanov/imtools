@@ -91,7 +91,7 @@ diff(cv::Mat& result, const cv::Mat& a, const cv::Mat& b)
   cv::absdiff(a, b, result);
 
   // Convert to grayscale
-  debug_log("diff: cvtColor() to grayscale, channels = %d\n", result.channels());
+  debug_log("diff: cvtColor() to grayscale, channels = %d", result.channels());
   if (result.channels() > 1) {
     cv::cvtColor(result, result, CV_BGR2GRAY);
   }
@@ -180,7 +180,7 @@ match_template(cv::Point& match_loc, const cv::Mat& img, const cv::Mat& tpl)
 void
 patch(cv::Mat& out_mat, const cv::Mat& tpl_mat, const cv::Rect& roi)
 {
-  debug_log("imtools::patch(), x: %d, y: %d\n", roi.x, roi.y);
+  debug_log("imtools::patch(), x: %d, y: %d", roi.x, roi.y);
   debug_timer_init(t1, t2);
   debug_timer_start(t1);
 
@@ -323,7 +323,7 @@ make_heterogeneous(cv::Rect& rect, const cv::Mat& src)
     cv::meanStdDev(cv::Mat(src, rect), mean, stddev);
     ratio = stddev[0] / mean[0];
 
-    debug_log("make_heterogeneous: ratio = %lf mean = %lf stddev = %lf box: %dx%d @ %d;%d\n",
+    debug_log("make_heterogeneous: ratio = %lf mean = %lf stddev = %lf box: %dx%d @ %d;%d",
         ratio, mean[0], stddev[0], rect.width, rect.height, rect.x, rect.y);
 
     if (ratio >= min_ratio) {
@@ -331,7 +331,7 @@ make_heterogeneous(cv::Rect& rect, const cv::Mat& src)
     }
 
     if (!_enlarge(rect, src, step)) {
-      debug_log("make_heterogeneous: skipping to enlarge box: %dx%d @ %d;%d\n",
+      debug_log("make_heterogeneous: skipping to enlarge box: %dx%d @ %d;%d",
           rect.width, rect.height, rect.x, rect.y);
       // SRC boundaries reached. Can't enlarge RECT anymore.
       break;
@@ -357,12 +357,12 @@ bound_boxes(BoundBoxVector& result, const cv::Mat& in_mask, int min_threshold, i
   if (mask.channels() < 3) {
     mask = in_mask.clone();
   } else {
-    debug_log("bound_boxes: cvtColor() to grayscale, channels = %d\n", in_mask.channels());
+    debug_log("bound_boxes: cvtColor() to grayscale, channels = %d", in_mask.channels());
     cv::cvtColor(in_mask, mask, CV_BGR2GRAY);
   }
 
   // Suppress noise
-  debug_log("bound_boxes: threshold(%d, %d)\n", min_threshold, max_threshold);
+  debug_log("bound_boxes: threshold(%d, %d)", min_threshold, max_threshold);
   cv::threshold(mask, mask, min_threshold, max_threshold, cv::THRESH_BINARY);
 #if 0
   cv::Canny(mask, mask, min_threshold, min_threshold * 3, 3);
@@ -387,10 +387,10 @@ bound_boxes(BoundBoxVector& result, const cv::Mat& in_mask, int min_threshold, i
 
     boxes.push_back(rect);
   }
-  debug_log("bound_boxes number: %ld\n", boxes.size());
+  debug_log("bound_boxes number: %ld", boxes.size());
 
   _merge_small_boxes(result, boxes, mask);
-  debug_log("bound_boxes number after merging small boxes: %ld\n", result.size());
+  debug_log("bound_boxes number after merging small boxes: %ld", result.size());
 
   debug_timer_end(t1, t2, imtools::bound_boxes);
 }

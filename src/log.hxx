@@ -17,13 +17,18 @@
 #ifndef IMTOOLS_LOG_HXX
 #define IMTOOLS_LOG_HXX
 
+#include <sys/types.h>
 #include <stdio.h>
 #include <cstdarg>
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 #include "imtools-types.hxx"
 #include "threads.hxx"
+
+/////////////////////////////////////////////////////////////////////
+// Fwd decl
 
 namespace imtools {
 extern uint_t verbose;
@@ -38,57 +43,37 @@ namespace imtools { namespace log {
 # define IMTOOLS_THREAD_ID 0
 #endif
 
-#ifdef IMTOOLS_DEBUG
-# define debug_log0(__str)                                                \
-  do {                                                                    \
-    IT_IO_SCOPED_LOCK(__scoped_lock);                                     \
-    printf("[Debug] [%ld] " __str, static_cast<long>(IMTOOLS_THREAD_ID)); \
+#define verbose_log(...)                                           \
+  do {                                                             \
+    if (imtools::verbose) {                                        \
+      imtools::log::write(imtools::log::Level::INFO, __VA_ARGS__); \
+    }                                                              \
+  } while (0)
+#define verbose_log2(...)                                          \
+  do {                                                             \
+    if (imtools::verbose > 1) {                                    \
+      imtools::log::write(imtools::log::Level::INFO, __VA_ARGS__); \
+    }                                                              \
   } while (0)
 
-# define debug_log(__fmt, ...)                                      \
-  do {                                                              \
-    IT_IO_SCOPED_LOCK(__scoped_lock);                               \
-    printf("[Debug] [%ld] " __fmt, static_cast<long>(IMTOOLS_THREAD_ID), __VA_ARGS__); \
-  } while (0)
+#ifdef IMTOOLS_DEBUG
+# define debug_log0(__str) imtools::log::write(imtools::log::Level::DEBUG, (__str))
+# define debug_log(__fmt, ...) imtools::log::write(imtools::log::Level::DEBUG, (__fmt), __VA_ARGS__)
 #else
 # define debug_log0(__str)
 # define debug_log(__fmt, ...)
-#endif
+#endif// IMTOOLS_DEBUG
+#define error_log(...)   imtools::log::write(imtools::log::Level::ERROR,   __VA_ARGS__)
+#define warning_log(...) imtools::log::write(imtools::log::Level::WARNING, __VA_ARGS__)
+#define notice_log(...)  imtools::log::write(imtools::log::Level::NOTICE,  __VA_ARGS__)
 
-
-#define verbose_log(...)                \
-  do {                                  \
-    if (imtools::verbose) {             \
-      IT_IO_SCOPED_LOCK(__scoped_lock); \
-      printf(__VA_ARGS__);              \
-    }                                   \
-  } while (0)
-#define verbose_log2(...)               \
-  do {                                  \
-    if (imtools::verbose > 1) {         \
-      IT_IO_SCOPED_LOCK(__scoped_lock); \
-      printf("v2: " __VA_ARGS__);       \
-    }                                   \
-  } while (0)
-
-#define error_log(...)                         \
-  do {                                         \
-    IT_IO_SCOPED_LOCK(__scoped_lock);          \
-    fprintf(stderr, "[Error] " __VA_ARGS__);   \
-  } while (0)
-#define warning_log(...)                       \
-  do {                                         \
-    IT_IO_SCOPED_LOCK(__scoped_lock);          \
-    fprintf(stderr, "[Warning] " __VA_ARGS__); \
-  } while (0)
-
-#define strict_log(is_strict, ...)       \
-  do {                                   \
-    if ((is_strict)) {                   \
+#define strict_log(is_strict, ...)                \
+  do {                                            \
+    if ((is_strict)) {                            \
       throw imtools::ErrorException(__VA_ARGS__); \
-    } else {                             \
-      warning_log(__VA_ARGS__);          \
-    }                                    \
+    } else {                                      \
+      warning_log(__VA_ARGS__);                   \
+    }                                             \
   } while(0)
 
 #ifdef IMTOOLS_DEBUG_PROFILER
@@ -110,30 +95,26 @@ namespace imtools { namespace log {
 #endif
 
 /////////////////////////////////////////////////////////////////////
+// Types
 
-typedef std::vector<std::string> errors_t;
-extern errors_t error_stack;
+enum Level : int
+{
+  ERROR,
+  WARNING,
+  NOTICE,
+  INFO,
+  DEBUG,
+  NONE,
+};
 
 /////////////////////////////////////////////////////////////////////
 
-inline void push_error(const std::string& msg)
-{
-  error_stack.push_back(msg);
-}
+void push_error(const std::string& msg) noexcept;
+void push_error(const char* msg, ...) noexcept;
+void warn_all() noexcept;
+void write(Level level, const char* format, ...) noexcept;
+void set_level(Level level) noexcept;
 
-
-void push_error(const char* msg, ...);
-
-
-inline void warn_all()
-{
-  if (!error_stack.empty()) {
-    for (errors_t::iterator it = error_stack.begin(); it != error_stack.end(); ++it) {
-      warning_log("%s\n", (*it).c_str());
-    }
-    error_stack.clear();
-  }
-}
 /////////////////////////////////////////////////////////////////////
 }} // namespace imtools::log
 #endif // IMTOOLS_LOG_HXX

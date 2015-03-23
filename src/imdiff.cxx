@@ -150,7 +150,7 @@ int main(int argc, char** argv)
   if (argc - optind == 2) {
     filename_old = argv[optind++];
     filename_new = argv[optind++];
-    verbose_log("Old file: %s, new file: %s\n", filename_old.c_str(), filename_new.c_str());
+    verbose_log("Old file: %s, new file: %s", filename_old.c_str(), filename_new.c_str());
   } else {
     fprintf(stderr, "Error: Invalid input.\n");
     usage(true);

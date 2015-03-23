@@ -80,7 +80,7 @@ MergeCommand::_processPatch(const BoundBox& box, const cv::Mat& in_img, cv::Mat&
 
   BoundBox homo_box(box);
 
-  debug_log("%s: %dx%d @ %d;%d\n", __func__, box.width, box.height, box.x, box.y);
+  debug_log("%s: %dx%d @ %d;%d", __func__, box.width, box.height, box.x, box.y);
 
   try {
     // The more the box area is heterogeneous on m_old_img, the more chances
@@ -97,14 +97,14 @@ MergeCommand::_processPatch(const BoundBox& box, const cv::Mat& in_img, cv::Mat&
       std::ostringstream osstr;
       osstr << "old_tpl_img_" << box.x << "@" << box.y << "_" << box.width << "x" << box.height << ".jpg";
       std::string fn = osstr.str();
-      debug_log("* Writing to %s\n", fn.c_str());
+      debug_log("* Writing to %s", fn.c_str());
       cv::imwrite(fn, old_tpl_img);
     }
     {
       std::ostringstream osstr;
       osstr << "new_tpl_img_" << homo_box.x << "@" << homo_box.y << "_" << homo_box.width << "x" << homo_box.height << ".jpg";
       std::string fn = osstr.str();
-      debug_log("* Writing to %s\n", fn.c_str());
+      debug_log("* Writing to %s", fn.c_str());
       cv::imwrite(fn, new_tpl_img);
     }
 #endif
@@ -122,19 +122,19 @@ MergeCommand::_processPatch(const BoundBox& box, const cv::Mat& in_img, cv::Mat&
       assert(box.x >= homo_box.x && box.y >= homo_box.y);
 
       roi = cv::Rect(match_loc.x + (box.x - homo_box.x), match_loc.y + (box.y - homo_box.y), box.width, box.height);
-      debug_log("homo_box != *box, roi = (%d, %d, %d, %d)\n", roi.x, roi.y, roi.width, roi.height);
+      debug_log("homo_box != *box, roi = (%d, %d, %d, %d)", roi.x, roi.y, roi.width, roi.height);
     } else {
       roi = cv::Rect(match_loc.x, match_loc.y, old_tpl_img.cols, old_tpl_img.rows);
-      debug_log("homo_box == *box, roi = (%d, %d, %d, %d)\n", roi.x, roi.y, roi.width, roi.height);
+      debug_log("homo_box == *box, roi = (%d, %d, %d, %d)", roi.x, roi.y, roi.width, roi.height);
     }
     roi_new = cv::Rect(match_loc_new.x, match_loc_new.y, new_tpl_img.cols, new_tpl_img.rows);
-    debug_log("roi_new = (%d, %d, %d, %d)\n", roi_new.x, roi_new.y, roi_new.width, roi_new.height);
+    debug_log("roi_new = (%d, %d, %d, %d)", roi_new.x, roi_new.y, roi_new.width, roi_new.height);
 
     // Calculate average similarity
 
     avg_mssim     = imtools::get_avg_MSSIM(new_tpl_img, cv::Mat(out_img, roi));
     avg_mssim_new = imtools::get_avg_MSSIM(new_tpl_img, cv::Mat(out_img, roi_new));
-    debug_log("avg_mssim: %f avg_mssim_new: %f\n", avg_mssim, avg_mssim_new);
+    debug_log("avg_mssim: %f avg_mssim_new: %f", avg_mssim, avg_mssim_new);
 
 #if 0
     // Check if a patched box intersects roi. If it is not, then we ought to
@@ -147,7 +147,7 @@ MergeCommand::_processPatch(const BoundBox& box, const cv::Mat& in_img, cv::Mat&
       // The `&` operator returns intersection of two rectangles.
       cv::Rect r = (*it) & roi;
       if (r.width) {
-        debug_log0("Got intersection\n");
+        debug_log0("Got intersection");
         b_intersection = true;
         break;
       }
@@ -157,10 +157,10 @@ MergeCommand::_processPatch(const BoundBox& box, const cv::Mat& in_img, cv::Mat&
     if (avg_mssim > avg_mssim_new /*|| avg_mssim < 0*/) {
       imtools::patch(out_img, new_tpl_img, roi);
       patched_boxes.push_back(cv::Rect(roi));
-      debug_log("<<<<<<<< Using roi: avg_mssim: %f avg_mssim_new: %f ratio: %f\n",
+      debug_log("<<<<<<<< Using roi: avg_mssim: %f avg_mssim_new: %f ratio: %f",
           avg_mssim, avg_mssim_new, (avg_mssim_new / avg_mssim));
     } else {
-      debug_log("<<<<<<<< Using roi_new: avg_mssim: %f avg_mssim_new: %f ratio: %f\n",
+      debug_log("<<<<<<<< Using roi_new: avg_mssim: %f avg_mssim_new: %f ratio: %f",
           avg_mssim, avg_mssim_new, (avg_mssim_new / avg_mssim));
       imtools::patch(out_img, new_tpl_img, roi_new);
       patched_boxes.push_back(cv::Rect(roi_new));
@@ -170,7 +170,7 @@ MergeCommand::_processPatch(const BoundBox& box, const cv::Mat& in_img, cv::Mat&
       std::ostringstream osstr;
       osstr << "patched_" << box.x << "@" << box.y << "_" << box.width << "x" << box.height << ".jpg";
       std::string filename = osstr.str();
-      debug_log("* Writing to %s\n", filename.c_str());
+      debug_log("* Writing to %s", filename.c_str());
       cv::imwrite(filename, out_img);
     }
 #endif
@@ -192,7 +192,7 @@ MergeCommand::_isHugeBoundBox(const BoundBox& box, const cv::Mat& out_img)
   double box_rel_size = box.area() * 100 / out_img.size().area();
   bool result = (box_rel_size > MAX_BOUND_BOX_SIZE_REL);
   if (result) {
-    warning_log("Bounding box is too large: %dx%d (%f%%)\n",
+    warning_log("Bounding box is too large: %dx%d (%f%%)",
         box.width, box.height, box_rel_size);
   }
   return (result);
@@ -211,7 +211,7 @@ MergeCommand::_processImage(const std::string& in_filename, const std::string& o
   BoundBoxVector patched_boxes;
 
   // Load target image forcing 3 channels
-  verbose_log2("Processing target: %s\n", in_filename.c_str());
+  verbose_log2("Processing target: %s", in_filename.c_str());
   in_img = cv::imread(in_filename, 1);
   if (in_img.empty()) {
     throw ErrorException("empty image skipped: " + in_filename);
@@ -227,7 +227,7 @@ MergeCommand::_processImage(const std::string& in_filename, const std::string& o
 
   // Process the patches
   for (uint_t i = 0; i < n_boxes; i++) {
-    debug_log("box[%d]: %dx%d @ %d;%d\n", i, boxes[i].width, boxes[i].height, boxes[i].x, boxes[i].y);
+    debug_log("box[%d]: %dx%d @ %d;%d", i, boxes[i].width, boxes[i].height, boxes[i].x, boxes[i].y);
 
     if (_isHugeBoundBox(boxes[i], out_img)) {
       continue;
@@ -241,7 +241,7 @@ MergeCommand::_processImage(const std::string& in_filename, const std::string& o
 
   if (!success) {
     imtools::log::warn_all();
-    error_log("%s: failed to process, skipping\n", in_filename.c_str());
+    error_log("%s: failed to process, skipping", in_filename.c_str());
     return (success);
   }
 
@@ -249,11 +249,11 @@ MergeCommand::_processImage(const std::string& in_filename, const std::string& o
   if (m_strict && out_filename == in_filename && imtools::file_exists(out_filename)) {
     throw ErrorException("strict mode prohibits writing to existing file " + out_filename);
   }
-  verbose_log2("Writing to %s\n", out_filename.c_str());
+  verbose_log2("Writing to %s", out_filename.c_str());
   if (!cv::imwrite(out_filename, out_img, getCompressionParams())) {
     throw FileWriteErrorException(out_filename);
   }
-  verbose_log("[Output] file:%s boxes:%d\n", out_filename.c_str(), n_boxes);
+  verbose_log("[Output] file:%s boxes:%d", out_filename.c_str(), n_boxes);
 
   return (success);
 }
@@ -309,7 +309,7 @@ MergeCommand::run(imtools::CommandResult& result)
         success &= false;
       }
     } catch (ErrorException& e) {
-      warning_log("%s\n", e.what());
+      warning_log("%s", e.what());
       _Pragma("omp atomic")
       success &= false;
     }
@@ -321,7 +321,7 @@ MergeCommand::run(imtools::CommandResult& result)
       if (!_processImage(trimPath(m_input_images[i]), trimPath(m_out_images[i])))
         success = false;
     } catch (ErrorException& e) {
-      warning_log("%s\n", e.what());
+      warning_log("%s", e.what());
       success = false;
     }
   }
@@ -419,7 +419,7 @@ MergeCommandFactory::create(const Command::Arguments& arguments) const
     Option option = static_cast<Option>(getOptionCode(key));
     Command::CValuePtr value = it.second;
 
-    verbose_log("key: %s, value: %s, option: %d\n",
+    verbose_log("key: %s, value: %s, option: %d",
         key.c_str(), (value->getType() == Command::Value::Type::STRING ? value->getString().c_str() : "[]"), option);
 
     switch (option) {
@@ -432,7 +432,7 @@ MergeCommandFactory::create(const Command::Arguments& arguments) const
       case Option::MIN_THRESHOLD: min_threshold      = std::stoi(value->getString());                    break;
       case Option::MAX_THRESHOLD: max_threshold      = std::stoi(value->getString());                    break;
       case Option::UNKNOWN:
-      default: warning_log("Skipping unknown key '%s'\n", key.c_str()); break;
+      default: warning_log("Skipping unknown key '%s'", key.c_str()); break;
     }
   }
 

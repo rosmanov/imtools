@@ -76,7 +76,7 @@ main(int argc, char **argv)
           usage(true);
 
         default:
-          error_log("getopt returned character code 0%o\n", next_option);
+          error_log("getopt returned character code 0%o", next_option);
           usage(true);
       }
     } while (next_option != -1);
@@ -85,7 +85,7 @@ main(int argc, char **argv)
       g_mask_filename = argv[optind++];
 
       if (!imtools::file_exists(g_mask_filename.c_str())) {
-        error_log("image %s doesn't exist.\n", g_mask_filename.c_str());
+        error_log("image %s doesn't exist.", g_mask_filename.c_str());
         usage(true);
       }
 
@@ -166,7 +166,7 @@ thresh_callback(int, void*)
 
       osstr << "rect" << i << ".jpg";
       std::string filename = osstr.str();
-      error_log("* Writing to %s\n", filename.c_str());
+      error_log("* Writing to %s", filename.c_str());
       cv::imwrite(filename, cv::Mat(g_src, boundRect[i]));
     }
 

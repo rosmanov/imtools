@@ -37,7 +37,7 @@ if (IMTOOLS_SERVER)
   list (APPEND IMTOOLS_BOOST_COMPONENTS system)
   set(Boost_FOUND 0)
   include(FindBoost)
-  find_package(Boost REQUIRED COMPONENTS ${IMTOOLS_BOOST_COMPONENTS})
+  find_package(Boost "1.52.0" REQUIRED COMPONENTS ${IMTOOLS_BOOST_COMPONENTS})
   if (NOT Boost_FOUND)
     message (FATAL_ERROR "Boost library with '${IMTOOLS_BOOST_COMPONENTS}' components not found")
   endif (NOT Boost_FOUND)
@@ -57,8 +57,7 @@ if (IMTOOLS_SERVER)
   endif (WEBSOCKETPP_FOUND)
   include_directories(${WEBSOCKETPP_INCLUDE_DIR})
 
-  set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES}
-  ${Boost_INCLUDE_DIRS} ${WEBSOCKETPP_INCLUDE_DIR}")
+  set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES} ${Boost_INCLUDE_DIRS} ${WEBSOCKETPP_INCLUDE_DIR}")
 endif (IMTOOLS_SERVER)
 
 if (IMTOOLS_THREADS)
@@ -91,6 +90,14 @@ if (IMTOOLS_EXTRA)
 endif (IMTOOLS_EXTRA)
 
 include_directories(${LIBOPENCV_INCLUDE_DIR})
+
+if (NOT CMAKE_SYSTEM_NAME STREQUAL FreeBSD)
+  set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
+endif ()
+include(CheckIncludeFiles)
+check_include_files(sys/prctl.h HAVE_SYS_PRCTL_H)
+include(CheckSymbolExists)
+check_symbol_exists(PR_SET_DUMPABLE "sys/prctl.h" HAVE_PR_SET_DUMPABLE)
 
 foreach(exec_item IN ITEMS ${imtools_targets})
   set(src_api src/${exec_item}-api.cxx)

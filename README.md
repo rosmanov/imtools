@@ -16,7 +16,6 @@ make
 - `-DIMTOOLS_DEBUG=ON|OFF` - whether to turn on/off debug mode (no optimization, lots of output). Default: OFF.
 - `-DIMTOOLS_DEBUG_PROFILER=ON|OFF - Enable profiling info in debug messages. Default: OFF.`
 - `-DIMTOOLS_THREADS=ON|OFF` - whether to enable threading (some operations will run in parallel). Default: ON.
-- `-DIMTOOLS_THREADS_BOOST=ON|OFF - use boost libraries for threading. Default: OFF.`
 - `-DIMTOOLS_EXTRA=ON|OFF` - whether to build extra tools. Default: OFF.
 - `-DIMTOOLS_SERVER=ON|OFF - whether to build WebSocket server. Default: OFF.`
 

@@ -136,11 +136,11 @@ MetaCommandFactory::create(const Command::Arguments& arguments) const
     std::string str_value = value->getString();
     Option option = static_cast<Option>(getOptionCode(key));
 
-    verbose_log("key: %s, value: %s, option: %d\n", key.c_str(), str_value.c_str(), option);
+    verbose_log("key: %s, value: %s, option: %d", key.c_str(), str_value.c_str(), option);
 
     switch (option) {
       case Option::SUBCOMMAND: subcommand = MetaCommand::getSubCommandCode(str_value); break;
-      default: warning_log("Skipping unknown key '%s'\n", key.c_str()); break;
+      default: warning_log("Skipping unknown key '%s'", key.c_str()); break;
     }
   }
 
