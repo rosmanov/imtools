@@ -189,7 +189,7 @@ class AppConfig
 
   protected:
     /// Whether absolute paths are passed to commands "as is"
-    bool m_allow_absolute_paths = false;
+    bool m_allow_absolute_paths = true;
     /// Network port to listen on
     uint16_t m_port = 9902;
     /// Server hostname or IP to listen on

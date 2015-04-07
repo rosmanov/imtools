@@ -94,6 +94,7 @@ namespace imtools { namespace log {
 # define debug_timer_end(__t1, __t2, __name)
 #endif
 
+
 /////////////////////////////////////////////////////////////////////
 // Types
 

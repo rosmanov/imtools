@@ -99,7 +99,7 @@ where
 
 Serialized arguments for `resize` command:
 
-    source + output + width + height + fx + fy
+    source + output + width + height + round(fx * 1000) / 1000 + round(fy * 1000) / 1000
 
 *Request example: make 50%-thumbnail from source.png and save it to thumbnail.png*
 
@@ -176,7 +176,6 @@ Supported arguments:
 - `input_images` - required; array of input images
 - `output_images` - required; array of output images (size must be equal to size of `input_images`)
 - `strict` - optional; value > 0 turns some warnings into fatal errors
-- `out_dir` - output directory; default : `'.'`
 - `min_threshold` - Min. noise suppression threshold (see `immerge -h`)
 - `max_threshold` - Max. noise suppression threshold (see `immerge -h`)
 
@@ -201,7 +200,7 @@ Supported arguments:
 
 where `digest` is computed as
 
-    sha1(application_name + old_image + new_image + out_dir + size(output_images)
+    sha1(application_name + old_image + new_image + size(output_images)
         + strict + private_key)
        = sha1('application_1' + 'old.jpg' + 'new.jpg' + '.' + '1' + '2' + 'yeBOfetLDTkP')
        = 'f6bca39b56b85cac90398b69e2b10378591508c2'

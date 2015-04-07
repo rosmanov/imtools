@@ -20,6 +20,8 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 include(ImToolsCompiler)
+include(CheckIncludeFiles)
+include(CheckSymbolExists)
 
 find_package(LibOpenCV REQUIRED)
 
@@ -36,7 +38,6 @@ if (IMTOOLS_SERVER)
   # Boost library
   list (APPEND IMTOOLS_BOOST_COMPONENTS system)
   set(Boost_FOUND 0)
-  include(FindBoost)
   find_package(Boost "1.52.0" REQUIRED COMPONENTS ${IMTOOLS_BOOST_COMPONENTS})
   if (NOT Boost_FOUND)
     message (FATAL_ERROR "Boost library with '${IMTOOLS_BOOST_COMPONENTS}' components not found")
@@ -57,22 +58,25 @@ if (IMTOOLS_SERVER)
   endif (WEBSOCKETPP_FOUND)
   include_directories(${WEBSOCKETPP_INCLUDE_DIR})
 
+  # Syslog
+  #check_include_files(syslog.h HAVE_SYSLOG_H)
+  #check_symbol_exists(openlog "syslog.h" HAVE_SYSLOG)
+
   set(CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES} ${Boost_INCLUDE_DIRS} ${WEBSOCKETPP_INCLUDE_DIR}")
 endif (IMTOOLS_SERVER)
 
 if (IMTOOLS_THREADS)
-    include(FindOpenMP)
-    find_package(OpenMP)
+  include(FindOpenMP)
+  find_package(OpenMP)
 
-    if (NOT OPENMP_FOUND)
-      message (FATAL_ERROR "OpenMP is not supported")
-    endif (NOT OPENMP_FOUND)
+  if (NOT OPENMP_FOUND)
+    message (FATAL_ERROR "OpenMP is not supported")
+  endif (NOT OPENMP_FOUND)
 
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    list(APPEND imtools_threads_src src/threads.cxx)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  list(APPEND imtools_threads_src src/threads.cxx)
 
-    add_definitions(-DUSE_OPENMP)
   add_definitions(-DIMTOOLS_THREADS)
 endif (IMTOOLS_THREADS)
 
@@ -94,9 +98,7 @@ include_directories(${LIBOPENCV_INCLUDE_DIR})
 if (NOT CMAKE_SYSTEM_NAME STREQUAL FreeBSD)
   set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
 endif ()
-include(CheckIncludeFiles)
 check_include_files(sys/prctl.h HAVE_SYS_PRCTL_H)
-include(CheckSymbolExists)
 check_symbol_exists(PR_SET_DUMPABLE "sys/prctl.h" HAVE_PR_SET_DUMPABLE)
 
 foreach(exec_item IN ITEMS ${imtools_targets})

@@ -165,19 +165,6 @@ main(int argc, char **argv)
           }
           break;
 
-        case 'd':
-          {
-            struct stat st;
-            if (stat(optarg, &st)) {
-              throw InvalidCliArgException("invalid output directory '%s', %s.", optarg, strerror(errno));
-            }
-            if (!S_ISDIR(st.st_mode)) {
-              throw InvalidCliArgException("%s is not a directory.", optarg);
-            }
-            g_out_dir = optarg;
-            break;
-          }
-
         case 'L':
           save_int_opt_arg(g_min_threshold, "Invalid min threshold");
           break;
@@ -237,7 +224,6 @@ main(int argc, char **argv)
     exit(2);
   }
 
-  debug_log("out-dir: %s",         g_out_dir.c_str());
   debug_log("pairs: %d",           (int) g_pairs);
   debug_log("strict: %d",          (int) g_strict);
   debug_log("min-threshold: %d",   g_min_threshold);
@@ -261,7 +247,6 @@ main(int argc, char **argv)
         g_out_images,
         g_old_image_filename,
         g_new_image_filename,
-        g_out_dir,
         g_strict,
         g_min_threshold,
         g_max_threshold,

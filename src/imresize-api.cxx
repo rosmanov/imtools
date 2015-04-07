@@ -153,7 +153,8 @@ ResizeCommand::serialize() const noexcept
 
     ss << m_source << m_output
       << m_width << m_height
-      << m_fx << m_fy;
+      << round(m_fx * 1000) / 1000
+      << round(m_fy * 1000) / 1000;
 
     return ss.str();
 }

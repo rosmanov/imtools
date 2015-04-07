@@ -37,7 +37,6 @@ class MergeCommand : public ::imtools::Command
         const imtools::ImageArray& out_images,
         const std::string& old_image_filename,
         const std::string& new_image_filename,
-        const std::string& out_dir,
         int strict,
         int min_threshold,
         int max_threshold,
@@ -71,7 +70,6 @@ class MergeCommand : public ::imtools::Command
     imtools::ImageArray m_out_images;
     std::string m_old_image_filename;
     std::string m_new_image_filename;
-    std::string m_out_dir;
     /*! Turn some warnings into fatal errors. Can be used multiple times
      * to increase strictness.*/
     int m_strict = 0;
@@ -119,7 +117,6 @@ class MergeCommandFactory : public ::imtools::CommandFactory
       STRICT,
       NEW_IMAGE,
       OLD_IMAGE,
-      OUT_DIR,
       MIN_THRESHOLD,
       MAX_THRESHOLD,
       INPUT_IMAGES,

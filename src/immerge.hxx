@@ -34,7 +34,6 @@ int g_max_threshold = THRESHOLD_MAX;
 
 std::string g_old_image_filename;
 std::string g_new_image_filename;
-std::string g_out_dir = ".";
 
 /// Whether non-option ARGV-elements are interpreted as `input-file output-file` pairs
 bool g_pairs = false;
@@ -69,9 +68,7 @@ const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 "                            to increase strictness. Default: off.\n"
 " -n, --new-image            New image. Required.\n"
 " -o, --old-image            Old image. Required.\n"
-" -d, --out-dir              Output directory. Default: current directory.\n"
 " -p, --pairs                Interpret IMAGES as a list of input and output file pairs.\n"
-"                            If present, -d (--out-dir) has no effect.\n"
 #if 0
 " -m, --mod-threshold        Modification threshold in %%. Default: %d.\n"
 #endif
@@ -90,7 +87,7 @@ const char* g_usage_template = IMTOOLS_FULL_NAME "\n\n" IMTOOLS_COPYRIGHT "\n\n"
 /////////////////////////////////////////////////////////////////////
 // CLI arguments.
 
-const char *g_short_options = "hvVsn:o:d:pm:L:H:"
+const char *g_short_options = "hvVsn:o:pm:L:H:"
 #ifdef IMTOOLS_THREADS
   "T:"
 #endif
@@ -102,7 +99,6 @@ const struct option g_long_options[] = {
   {"strict",        no_argument,       NULL, 's'},
   {"new-image",     required_argument, NULL, 'n'},
   {"old-image",     required_argument, NULL, 'o'},
-  {"out-dir",       required_argument, NULL, 'd'},
   {"pairs",         no_argument,       NULL, 'p'},
 #if 0
   {"mod-threshold", required_argument, NULL, 'm'},

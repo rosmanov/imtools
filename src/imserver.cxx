@@ -23,6 +23,11 @@
 #ifdef HAVE_SYS_PRCTL_H
 # include <sys/prctl.h>
 #endif
+#if 0
+#ifdef HAVE_SYSLOG_H
+# include <syslog.h>
+#endif
+#endif
 #include <signal.h>
 #include <sys/wait.h>
 #include <sstream>
@@ -87,6 +92,8 @@ static std::set<pid_t> g_children;
 static int g_pid_fd{-1};
 /// Original signal mask. Should be initialized only once at startup.
 static sigset_t g_org_sigmask;
+/// Original umask
+static mode_t g_saved_umask;
 
 /////////////////////////////////////////////////////////////////////
 // Initalizing static member variables
@@ -1019,7 +1026,7 @@ daemonize()
   debug_log0("created new session");
 
   // Set permissions for new files
-  umask(027);
+  g_saved_umask = umask(027);
 
   // Prevent zombies by means of a second fork.
   // Second fork guarantees that the child is no longer a session leader,
@@ -1183,6 +1190,8 @@ run(AppConfigPtrList& config_list)
     exit(EXIT_FAILURE);
   }
 
+  mode_t saved_umask = umask(g_saved_umask);
+
   for (auto& config : config_list) {
     child_pid = fork();
 
@@ -1207,6 +1216,8 @@ run(AppConfigPtrList& config_list)
     verbose_log("Forked worker, PID: %ld", static_cast<long>(child_pid));
     g_children.insert(child_pid);
   }
+
+  umask(saved_umask);
 
   // The following goes within parent process
 

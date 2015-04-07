@@ -47,7 +47,6 @@ MergeCommand::MergeCommand(
     const imtools::ImageArray& out_images,
     const std::string& old_image_filename,
     const std::string& new_image_filename,
-    const std::string& out_dir,
     int strict,
     int min_threshold,
     int max_threshold,
@@ -56,7 +55,6 @@ MergeCommand::MergeCommand(
   m_out_images(out_images),
   m_old_image_filename(old_image_filename),
   m_new_image_filename(new_image_filename),
-  m_out_dir(out_dir),
   m_strict(strict),
   m_min_threshold(min_threshold),
   m_max_threshold(max_threshold),
@@ -342,7 +340,6 @@ MergeCommand::serialize() const noexcept
 
   ss << m_old_image_filename
     << m_new_image_filename
-    << m_out_dir
     //<< m_input_images.size()
     << m_out_images.size()
     << m_strict;
@@ -372,8 +369,6 @@ MergeCommandFactory::getOptionCode(const std::string& o) const noexcept
     case 'o':
       if (o == "old_image") {
         code = Option::OLD_IMAGE;
-      }  else if (o == "out_dir") {
-        code = Option::OUT_DIR;
       }  else if (o == "output_images") {
         code = Option::OUTPUT_IMAGES;
       } else {
@@ -408,7 +403,6 @@ MergeCommandFactory::create(const Command::Arguments& arguments) const
   imtools::ImageArray out_images;
   std::string         old_image_filename;
   std::string         new_image_filename;
-  std::string         out_dir{"."};
   int                 strict              = 0;
   int                 min_threshold       = imtools::Threshold::THRESHOLD_MIN;
   int                 max_threshold       = imtools::Threshold::THRESHOLD_MAX;
@@ -427,7 +421,6 @@ MergeCommandFactory::create(const Command::Arguments& arguments) const
       case Option::OUTPUT_IMAGES: out_images         = value->getArray();                                break;
       case Option::OLD_IMAGE:     old_image_filename = value->getString();                               break;
       case Option::NEW_IMAGE:     new_image_filename = value->getString();                               break;
-      case Option::OUT_DIR:       out_dir            = value->getString();                               break;
       case Option::STRICT:        strict             = std::stoi(value->getString());                    break;
       case Option::MIN_THRESHOLD: min_threshold      = std::stoi(value->getString());                    break;
       case Option::MAX_THRESHOLD: max_threshold      = std::stoi(value->getString());                    break;
@@ -453,7 +446,6 @@ MergeCommandFactory::create(const Command::Arguments& arguments) const
       out_images,
       old_image_filename,
       new_image_filename,
-      out_dir,
       strict,
       min_threshold,
       max_threshold,

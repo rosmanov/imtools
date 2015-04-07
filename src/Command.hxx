@@ -152,7 +152,7 @@ class Command
     };
 
     ///////////////////////////////////////////////////////////////
-    Command() : m_allow_absolute_paths(false) {}
+    Command() : m_allow_absolute_paths(true) {}
     Command(const Command&) = delete;
     Command(const Command&&) = delete;
 
@@ -184,7 +184,7 @@ class Command
     /// Format-specific save parameters for `cv::imwrite()`.
     static CompressionParams s_compression_params;
     /// Whether to allow absolute path processing
-    bool m_allow_absolute_paths = false;
+    bool m_allow_absolute_paths = true;
     const char* PATH_DELIMS = " \t\r\n/";
 };
 

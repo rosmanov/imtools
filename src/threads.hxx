@@ -17,9 +17,6 @@
 #ifndef IMTOOLS_THREADS_HXX
 #define IMTOOLS_THREADS_HXX
 #ifdef IMTOOLS_THREADS
-#ifndef USE_OPENMP
-# error "OpenMP required"
-#endif
 #include <omp.h>
 #include <thread> // std::thread::hardware_concurrency()
 // OmpGuard is not the fastest way to lock in OpenMP. The `critical` sections
