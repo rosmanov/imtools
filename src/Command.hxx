@@ -148,7 +148,11 @@ class Command
       /// `imresize` command
       RESIZE,
       /// `immerge` command
-      MERGE
+      MERGE,
+#ifdef IMTOOLS_EXTRA
+      /// for `imtools::diff()`
+      DIFF,
+#endif
     };
 
     ///////////////////////////////////////////////////////////////
@@ -210,9 +214,10 @@ class CommandFactory
 class CommandResult
 {
   public:
-    CommandResult() {}
-    CommandResult(const CommandResult&) = delete;
+    CommandResult() : m_value{""} {}
+    //CommandResult(const CommandResult&) = delete;
     CommandResult& operator=(const CommandResult&) = delete;
+    explicit CommandResult(const std::string& value) : m_value{value} {}
 
     inline void setValue(const std::string& value) noexcept { m_value = value; }
     inline std::string getValue() const noexcept { return m_value; }

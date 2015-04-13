@@ -50,6 +50,11 @@ Command::getType(const std::string& c)
         code = Command::Type::UNKNOWN;
       }
       break;
+#ifdef IMTOOLS_EXTRA
+    case 'd':
+      code = c == "diff" ? Command::Type::DIFF : Command::Type::UNKNOWN;
+      break;
+#endif
     default:
       code = Command::Type::UNKNOWN;
       break;

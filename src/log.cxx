@@ -70,8 +70,8 @@ void
 warn_all() noexcept
 {
   if (!g_error_stack.empty()) {
-    for (ErrorStack::iterator it = g_error_stack.begin(); it != g_error_stack.end(); ++it) {
-      warning_log("%s", (*it).c_str());
+    for (auto& it : g_error_stack) {
+      warning_log("%s", it.c_str());
     }
     g_error_stack.clear();
   }

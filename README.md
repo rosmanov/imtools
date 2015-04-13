@@ -205,6 +205,37 @@ where `digest` is computed as
        = sha1('application_1' + 'old.jpg' + 'new.jpg' + '.' + '1' + '2' + 'yeBOfetLDTkP')
        = 'f6bca39b56b85cac90398b69e2b10378591508c2'
 
+*Request format for `diff` command*
+
+    {
+      "command"    : "diff",
+      "arguments": { ... },
+      "digest"     : "(SHA-1)"
+    }
+
+Supported arguments:
+- `old_image` - path to "old" image
+- `new_image` - path to "new" image
+- `out_image` - path to output image file where the difference will be stored
+
+*Example meta request*
+
+    {
+      "command": "diff",
+      "arguments": {
+        "old_image": "old.jpg",
+        "new_image": "new.jpg",
+        "out_image": "diff.jpg",
+      },
+      "digest": "b89d207f0aeaedab3d044ac968f3d9d502cfcb3c"
+    }
+
+where `digest` is computed as
+
+    sha1(application_name + old_image + new_image + private_key)
+       = sha1('application_1' + 'old.jpg' + 'new.jpg' + 'yeBOfetLDTkP')
+       = 'b89d207f0aeaedab3d044ac968f3d9d502cfcb3c'
+
 
 [Nginx](http://nginx.org) configuration:
 

@@ -107,6 +107,17 @@
       digest: 'f6bca39b56b85cac90398b69e2b10378591508c2'
     })" />
 
+    <input type="button" name="" id="" value="test diff"
+    onclick="sendMessage({
+      command: 'diff',
+      arguments: {
+        old_image: 'old.jpg',
+        new_image: 'new.jpg',
+        out_image: 'diff.jpg',
+      },
+      digest: 'a8078c00b007ab69d96473ae75cfb2643312e941'
+    })" />
+
     <pre id="output" style=""></pre>
   </body>
 </html>

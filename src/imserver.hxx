@@ -36,6 +36,9 @@
 #include "imresize-api.hxx"
 #include "immerge-api.hxx"
 #include "imtools-meta.hxx"
+#ifdef IMTOOLS_EXTRA
+#include "imdiff-api.hxx"
+#endif
 #include "log.hxx"
 
 
@@ -274,8 +277,9 @@ class Server
   public:
     enum class MessageType
     {
-      ERROR,
-      SUCCESS
+      ERROR    = 1,
+      SUCCESS  = 2,
+      PROGRESS = 3,
     };
 
     enum class CommandType : int

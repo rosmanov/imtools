@@ -369,6 +369,12 @@ get_command(Command::Type type, const Command::Arguments& arguments)
       factory_ptr = std::unique_ptr<CommandFactory>(new imtools::immerge::MergeCommandFactory());
       break;
 
+#ifdef IMTOOLS_EXTRA
+    case Command::Type::DIFF:
+      factory_ptr = std::unique_ptr<CommandFactory>(new imtools::imdiff::DiffCommandFactory());
+      break;
+#endif
+
     case Command::Type::UNKNOWN: // no break
     default:
       throw ErrorException("Unknown command code: %d", type);
@@ -651,10 +657,12 @@ Server::sendMessage(Connection conn, const std::string& message, const std::stri
     std::stringstream json_stream;
     websocketpp::lib::error_code ec;
 
-    // Generate JSON: {"error" : (int), "response" : "(string)", "digest" : "(string)"}
-    pt.put("error", (int) (type == Server::MessageType::ERROR));
     pt.put("response", message);
-    pt.put("digest", digest);
+    pt.put("type", (int) type);
+    if (type != Server::MessageType::PROGRESS) {
+      pt.put("error", (int) (type == Server::MessageType::ERROR));
+      pt.put("digest", digest);
+    }
 #ifdef IMTOOLS_DEBUG
     // Pretty-print JSON
     boost::property_tree::json_parser::write_json(json_stream, pt, true);
@@ -705,6 +713,7 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
   WebSocketServer::connection_ptr con = m_server.get_con_from_hdl(conn);
 
   ptree pt;
+  ptree pt_empty;
   std::string error;
   std::string input_digest;
   Command::Arguments arguments;
@@ -714,9 +723,21 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Parsing JSON: %s", ss.str().c_str());
     boost::property_tree::json_parser::read_json(ss, pt);
 
-    auto pt_arg       = pt.get_child("arguments");
-    auto command_name = pt.get<std::string>("command");
-    input_digest      = pt.get<std::string>("digest");
+    std::string default_value;
+
+    auto command_name = pt.get<std::string>("command", default_value);
+    input_digest      = pt.get<std::string>("digest", default_value);
+    auto pt_arg       = pt.get_child("arguments", pt_empty);
+
+    if (pt_arg.empty()) {
+      throw ErrorException("Arguments expected");
+    }
+    if (command_name.empty()) {
+      throw ErrorException("Empty command name");
+    }
+    if (input_digest.empty()) {
+      throw ErrorException("Empty digest");
+    }
 
     IMTOOLS_SERVER_OBJECT_LOG0(debug, "Started Transforming ptree values");
     std::transform(std::begin(pt_arg), std::end(pt_arg),
@@ -732,14 +753,13 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
 
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Running command: '%s'", command_name.c_str());
     command_ptr->setAllowAbsolutePaths(getAllowAbsolutePaths());
+
     CommandResult result;
     command_ptr->run(result);
-
     if (result) {
       sendMessage(conn, result, input_digest, Server::MessageType::SUCCESS);
       return;
     }
-
     error = "Empty result";
   } catch (boost::property_tree::json_parser_error& e) {
     error = std::string("Invalid JSON: ") + e.what();
@@ -747,9 +767,9 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
   } catch (ErrorException& e) {
     error = std::string("Fatal error: ") + e.what();
     error_log("%s", error.c_str());
-  } catch (...) {
+  } catch (std::exception& e) {
     error = "Internal Server Error";
-    error_log("Unknown error in '%s'!!! Please file a bug.", __func__);
+    error_log("Unhandled error in '%s': %s. Please file a bug.", __func__, strerror(errno));
   }
 
   debug_log("sending error message: %s", error.c_str());

@@ -20,7 +20,7 @@
 #define IMTOOLS_META_HXX
 /////////////////////////////////////////////////////////////////////
 
-#define IMTOOLS_VERSION "1.3.0"
+#define IMTOOLS_VERSION "2.0.0-dev"
 
 
 #ifdef IMTOOLS_DEBUG
