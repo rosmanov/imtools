@@ -96,6 +96,28 @@ const struct option g_long_options[] = {
   {0,           0,                 0,    0}
 };
 
+/////////////////////////////////////////////////////////////////////
+
+struct Action
+{
+    enum class Type : int
+    {
+      /// New connection opened
+      SUBSCRIBE   = 1,
+      /// Connection closed
+      UNSUBSCRIBE = 2,
+      /// Message arrived
+      MESSAGE     = 3
+    };
+
+    Action(Type t, Connection c) : type(t), conn(c) {}
+    Action(Type t, Connection c, WebSocketServer::message_ptr m)
+    : type(t), conn(c), msg(m) {}
+
+    Type type;
+    Connection conn;
+    WebSocketServer::message_ptr msg;
+};
 
 /////////////////////////////////////////////////////////////////////
 /// Misc. utilities
@@ -302,6 +324,8 @@ class Server
     void run();
     /// Stops accepting connections, closes all active connections
     void stop();
+    /// Thread function for actual work
+    void processMessages() noexcept;
 
   public:
     /// Callback which is invoked when a new connection is opened.
@@ -316,6 +340,9 @@ class Server
     void sigtermHandler(boost::system::error_code ec, int signal_number) noexcept;
     /// SIGSEGV, SIGBUS, SIGABRT, SIGILL and SIGFPE signals handler
     void crashHandler(boost::system::error_code ec, int signal_number) noexcept;
+
+  private:
+    void _messageHandler(Connection conn, WebSocketServer::message_ptr msg);
 
   public:
     inline uint16_t getPort() const noexcept { return m_config->getPort(); }
@@ -355,6 +382,16 @@ class Server
     uid_t m_uid{0};
     /// Linux group ID
     gid_t m_gid{0};
+
+  protected:
+    std::queue<Action> m_actions;
+    websocketpp::lib::mutex m_action_lock;
+    websocketpp::lib::mutex m_connection_lock;
+    websocketpp::lib::mutex m_quit_lock;
+    websocketpp::lib::mutex m_message_handler_lock;
+    websocketpp::lib::condition_variable m_action_cond;
+
+    bool m_stop_requested{false};
 };
 
 /////////////////////////////////////////////////////////////////////

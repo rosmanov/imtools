@@ -20,8 +20,7 @@
  */
 #include "immerge.hxx"
 
-#include <sys/stat.h>
-#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/core/core.hpp>
 
 #include "imtools-meta.hxx"
 #include "imtools-types.hxx"

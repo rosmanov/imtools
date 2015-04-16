@@ -38,6 +38,7 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/asio/signal_set.hpp>
+#include <websocketpp/common/thread.hpp>
 
 #if 0
 #include <boost/uuid/sha1.hpp>
@@ -68,6 +69,7 @@ using imtools::CommandResult;
 using imtools::imserver::g_server;
 using imtools::imserver::g_daemonize;
 using imtools::imserver::g_config_file;
+using imtools::imserver::Action;
 using imtools::imserver::Config;
 using imtools::imserver::AppConfig;
 using imtools::imserver::Server;
@@ -77,6 +79,10 @@ using imtools::imserver::ConfigPtr;
 using imtools::imserver::AppConfigPtrList;
 
 using boost::property_tree::ptree;
+
+using websocketpp::lib::unique_lock;
+using websocketpp::lib::mutex;
+using websocketpp::lib::thread;
 
 /////////////////////////////////////////////////////////////////////
 
@@ -685,16 +691,70 @@ Server::sendMessage(Connection conn, const std::string& message, const std::stri
 
 
 void
+Server::processMessages() noexcept
+{
+  while (1) {
+    unique_lock<mutex> lock(m_action_lock);
+
+    while (m_actions.empty()) {
+      IMTOOLS_SERVER_OBJECT_LOG0(debug, "Worker thread waiting for actions");
+
+      unique_lock<mutex> quit_lock(m_quit_lock);
+      if (m_stop_requested) {
+        return;
+      }
+      quit_lock.unlock();
+
+      m_action_cond.wait(lock);
+    }
+
+    Action a = m_actions.front();
+    m_actions.pop();
+    IMTOOLS_SERVER_OBJECT_LOG(debug, "Worker thread got action %d", a.type);
+    lock.unlock();
+
+    switch (a.type) {
+      case Action::Type::SUBSCRIBE:
+        {
+          unique_lock<mutex> con_lock(m_connection_lock);
+          m_connections.insert(a.conn);
+        }
+        break;
+      case Action::Type::UNSUBSCRIBE:
+        {
+          unique_lock<mutex> con_lock(m_connection_lock);
+          m_connections.erase(a.conn);
+        }
+        break;
+      case Action::Type::MESSAGE:
+        {
+          unique_lock<mutex> mh_lock(m_message_handler_lock);
+          _messageHandler(a.conn, a.msg);
+          mh_lock.unlock();
+        }
+        break;
+    }
+  }
+}
+
+
+void
 Server::onOpen(Connection conn) noexcept
 {
-  m_connections.insert(conn);
+  unique_lock<mutex> lock(m_action_lock);
+  m_actions.push(Action(Action::Type::SUBSCRIBE, conn));
+  lock.unlock();
+  m_action_cond.notify_one();
 }
 
 
 void
 Server::onClose(Connection conn) noexcept
 {
-  m_connections.erase(conn);
+  unique_lock<mutex> lock(m_action_lock);
+  m_actions.push(Action(Action::Type::UNSUBSCRIBE, conn));
+  lock.unlock();
+  m_action_cond.notify_one();
 }
 
 
@@ -707,7 +767,7 @@ Server::onFail(Connection conn) noexcept
 
 
 void
-Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
+Server::_messageHandler(Connection conn, WebSocketServer::message_ptr msg)
 {
   IMTOOLS_SERVER_OBJECT_LOG0(debug, "Message sent to default handler");
   WebSocketServer::connection_ptr con = m_server.get_con_from_hdl(conn);
@@ -753,6 +813,9 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
 
     IMTOOLS_SERVER_OBJECT_LOG(debug, "Running command: '%s'", command_name.c_str());
     command_ptr->setAllowAbsolutePaths(getAllowAbsolutePaths());
+    command_ptr->setEventCallback([&](const CommandResult& r) {
+        sendMessage(conn, r, std::string(), Server::MessageType::PROGRESS);
+    });
 
     CommandResult result;
     command_ptr->run(result);
@@ -776,11 +839,29 @@ Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
   sendMessage(conn, error, input_digest, Server::MessageType::ERROR);
 }
 
+
+void
+Server::onMessage(Connection conn, WebSocketServer::message_ptr msg) noexcept
+{
+  unique_lock<mutex> lock(m_action_lock);
+  m_actions.push(Action(Action::Type::MESSAGE, conn, msg));
+  lock.unlock();
+  m_action_cond.notify_one();
+
+}
+
 void
 Server::sigtermHandler(boost::system::error_code ec, int signal_number) noexcept
 {
   if (!ec) {
     IMTOOLS_SERVER_OBJECT_LOG(verbose, "Caught signal %d. Stopping", signal_number);
+
+    unique_lock<mutex> quit_lock(m_quit_lock);
+    m_stop_requested = true;
+    quit_lock.unlock();
+    m_action_cond.notify_all();
+
+    IMTOOLS_SERVER_OBJECT_LOG0(debug, "m_server.stop()");
     m_server.stop();
   }
 }
@@ -880,11 +961,13 @@ Server::run()
   if (!chdir_dir.empty()) {
     IMTOOLS_SERVER_OBJECT_LOG(debug, "chdir(%s)", chdir_dir.c_str());
     if (::chdir(chdir_dir.c_str()) != 0) {
-      throw ErrorException("chdir() failed: %s", strerror(errno));
+      throw ErrorException("chdir(): %s", strerror(errno));
     }
   } else if (chroot_done) {
     IMTOOLS_SERVER_OBJECT_LOG0(debug, "chdir(/)");
-    ::chdir("/");
+    if (::chdir("/") != 0) {
+      throw ErrorException("chdir(): %s", strerror(errno));
+    }
   }
 
   if (!openErorLog()) {
@@ -1228,7 +1311,10 @@ run(AppConfigPtrList& config_list)
       //g_server = imtools::imserver::ServerPtr(new Server(config));
       debug_log("replacing g_server, use count = %ld", g_server.use_count());
       g_server.reset(new Server(config));
+
+      thread worker_thread(bind(&Server::processMessages, ref(g_server)));
       g_server->run();
+      worker_thread.join();
 
       exit(EXIT_SUCCESS);
     }

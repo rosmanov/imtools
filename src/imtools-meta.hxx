@@ -19,6 +19,9 @@
 #ifndef IMTOOLS_META_HXX
 #define IMTOOLS_META_HXX
 /////////////////////////////////////////////////////////////////////
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
 
 #define IMTOOLS_VERSION "2.0.0-dev"
 

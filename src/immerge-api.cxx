@@ -66,9 +66,7 @@ MergeCommand::MergeCommand(
 bool
 MergeCommand::_processPatch(const BoundBox& box, const cv::Mat& in_img, cv::Mat& out_img, BoundBoxVector& patched_boxes)
 {
-  bool      success       = true;
-  cv::Mat   old_tpl_img;
-  cv::Mat   new_tpl_img;
+  bool      success{true};
   cv::Point match_loc;
   cv::Point match_loc_new;
   cv::Rect  roi;
@@ -85,27 +83,10 @@ MergeCommand::_processPatch(const BoundBox& box, const cv::Mat& in_img, cv::Mat&
     // to match this location on the image being patched.
     // However, imtools::make_heterogeneous() *modifies* the box! So we'll have to restore its size
     // before patching.
-    imtools::make_heterogeneous(/**box*/homo_box, m_old_img);
+    imtools::make_heterogeneous(homo_box, m_old_img);
 
-    old_tpl_img = cv::Mat(m_old_img, homo_box);
-    new_tpl_img = cv::Mat(m_new_img, box);
-
-#if 0 && defined(IMTOOLS_DEBUG)
-    {
-      std::ostringstream osstr;
-      osstr << "old_tpl_img_" << box.x << "@" << box.y << "_" << box.width << "x" << box.height << ".jpg";
-      std::string fn = osstr.str();
-      debug_log("* Writing to %s", fn.c_str());
-      cv::imwrite(fn, old_tpl_img);
-    }
-    {
-      std::ostringstream osstr;
-      osstr << "new_tpl_img_" << homo_box.x << "@" << homo_box.y << "_" << homo_box.width << "x" << homo_box.height << ".jpg";
-      std::string fn = osstr.str();
-      debug_log("* Writing to %s", fn.c_str());
-      cv::imwrite(fn, new_tpl_img);
-    }
-#endif
+    auto old_tpl_img(cv::Mat(m_old_img, homo_box));
+    auto new_tpl_img(cv::Mat(m_new_img, box));
 
     // Find likely location of an area similar to old_tpl_img on the image being processed now.
     imtools::match_template(match_loc, in_img, old_tpl_img);
@@ -129,55 +110,23 @@ MergeCommand::_processPatch(const BoundBox& box, const cv::Mat& in_img, cv::Mat&
     debug_log("roi_new = (%d, %d, %d, %d)", roi_new.x, roi_new.y, roi_new.width, roi_new.height);
 
     // Calculate average similarity
-
     avg_mssim     = imtools::get_avg_MSSIM(new_tpl_img, cv::Mat(out_img, roi));
     avg_mssim_new = imtools::get_avg_MSSIM(new_tpl_img, cv::Mat(out_img, roi_new));
     debug_log("avg_mssim: %f avg_mssim_new: %f", avg_mssim, avg_mssim_new);
 
-#if 0
-    // Check if a patched box intersects roi. If it is not, then we ought to
-    // skip the checks for avg_mssim_new. There is a number of functions computing intersection of different contours, e.g.:
-    // - pointPolygonTest() checks if a point is within a polygon.
-    // - cv::intersectConvexConvex() returns intersection area of two convex polygons (opencv2/imgproc/imgproc.hpp)
-    // However, we'll stick with a simple loop here.
-    bool b_intersection = false;
-    for (BoundBoxVector::iterator it = patched_boxes.begin(); it != patched_boxes.end(); ++it) {
-      // The `&` operator returns intersection of two rectangles.
-      cv::Rect r = (*it) & roi;
-      if (r.width) {
-        debug_log0("Got intersection");
-        b_intersection = true;
-        break;
-      }
-    }
-    if (!b_intersection || avg_mssim > avg_mssim_new /*|| avg_mssim < 0*/) {
-#endif
     if (avg_mssim > avg_mssim_new /*|| avg_mssim < 0*/) {
       imtools::patch(out_img, new_tpl_img, roi);
       patched_boxes.push_back(cv::Rect(roi));
-      debug_log("<<<<<<<< Using roi: avg_mssim: %f avg_mssim_new: %f ratio: %f",
-          avg_mssim, avg_mssim_new, (avg_mssim_new / avg_mssim));
     } else {
-      debug_log("<<<<<<<< Using roi_new: avg_mssim: %f avg_mssim_new: %f ratio: %f",
-          avg_mssim, avg_mssim_new, (avg_mssim_new / avg_mssim));
       imtools::patch(out_img, new_tpl_img, roi_new);
       patched_boxes.push_back(cv::Rect(roi_new));
     }
-#if 0 && defined(IMTOOLS_DEBUG)
-    {
-      std::ostringstream osstr;
-      osstr << "patched_" << box.x << "@" << box.y << "_" << box.width << "x" << box.height << ".jpg";
-      std::string filename = osstr.str();
-      debug_log("* Writing to %s", filename.c_str());
-      cv::imwrite(filename, out_img);
-    }
-#endif
   } catch (ErrorException& e) {
     success = false;
     imtools::log::push_error(e.what());
-  } catch (...) {
+  } catch (std::exception& e) {
     success = false;
-    imtools::log::push_error("Caught unknown exception!\n");
+    imtools::log::push_error("Unhandled exception: %s", e.what());
   }
 
   return (success);
@@ -201,7 +150,6 @@ bool
 MergeCommand::_processImage(const std::string& in_filename, const std::string& out_filename)
 {
   bool           success          = true;
-  uint_t         n_boxes;
   cv::Mat        in_img;
   cv::Mat        out_img;
   std::string    merged_filename;
@@ -210,6 +158,7 @@ MergeCommand::_processImage(const std::string& in_filename, const std::string& o
 
   // Load target image forcing 3 channels
   verbose_log2("Processing target: %s", in_filename.c_str());
+  invokeEventCallback((in_filename + " -> ") + out_filename);
   in_img = cv::imread(in_filename, 1);
   if (in_img.empty()) {
     throw ErrorException("empty image skipped: " + in_filename);
@@ -220,18 +169,17 @@ MergeCommand::_processImage(const std::string& in_filename, const std::string& o
 
   // Generate rectangles bounding clusters of white (changed) pixels on `m_diff_img`
   imtools::bound_boxes(boxes, m_diff_img, m_min_threshold, m_max_threshold);
-  n_boxes = boxes.size();
-  patched_boxes.reserve(n_boxes);
+  patched_boxes.reserve(boxes.size());
 
   // Process the patches
-  for (uint_t i = 0; i < n_boxes; i++) {
-    debug_log("box[%d]: %dx%d @ %d;%d", i, boxes[i].width, boxes[i].height, boxes[i].x, boxes[i].y);
+  for (auto& box : boxes) {
+    debug_log("bbox %dx%d @ %d;%d", box.width, box.height, box.x, box.y);
 
-    if (_isHugeBoundBox(boxes[i], out_img)) {
+    if (_isHugeBoundBox(box, out_img)) {
       continue;
     }
 
-    if (!_processPatch(boxes[i], in_img, out_img, patched_boxes)) {
+    if (!_processPatch(box, in_img, out_img, patched_boxes)) {
       success = false;
       break;
     }
@@ -248,10 +196,11 @@ MergeCommand::_processImage(const std::string& in_filename, const std::string& o
     throw ErrorException("strict mode prohibits writing to existing file " + out_filename);
   }
   verbose_log2("Writing to %s", out_filename.c_str());
+  invokeEventCallback(out_filename + " done");
   if (!cv::imwrite(out_filename, out_img, getCompressionParams())) {
     throw FileWriteErrorException(out_filename);
   }
-  verbose_log("[Output] file:%s boxes:%d", out_filename.c_str(), n_boxes);
+  verbose_log("[Output] file:%s boxes:%d", out_filename.c_str(), boxes.size());
 
   return (success);
 }
@@ -286,7 +235,6 @@ MergeCommand::run(imtools::CommandResult& result)
   if (m_out_images.size() != m_input_images.size()) {
     throw ErrorException("Number of input doesn't match number of output images");
   }
-
 
 #ifdef IMTOOLS_THREADS
   uint_t num_threads = m_input_images.size() >= m_max_threads ? m_max_threads : m_input_images.size();

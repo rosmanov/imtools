@@ -74,6 +74,9 @@ ResizeCommandFactory::_getInterpolationCode(const std::string& m) noexcept
     case 'c':
       code = m == "cubic" ? cv::INTER_CUBIC : DEFAULT_CODE;
       break;
+    default:
+      code = DEFAULT_CODE;
+      break;
   }
 
   return code;

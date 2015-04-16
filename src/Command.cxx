@@ -19,6 +19,7 @@
 #include <opencv2/highgui/highgui.hpp>
 
 #include "imtools-types.hxx"
+#include "threads.hxx"
 #include "Command.hxx"
 
 using imtools::Command;
@@ -31,6 +32,18 @@ Command::CompressionParams Command::s_compression_params(std::initializer_list<i
     CV_IMWRITE_JPEG_QUALITY, 90});
 
 /////////////////////////////////////////////////////////////////////
+
+void
+Command::invokeEventCallback(const std::string& message) const noexcept
+{
+  IT_IO_SCOPED_LOCK(_cmd_event_lock);
+
+  if (m_event_callback != nullptr) {
+    CommandResult result(message);
+    m_event_callback(result);
+  }
+}
+
 
 Command::Type
 Command::getType(const std::string& c)

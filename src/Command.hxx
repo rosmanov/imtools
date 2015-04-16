@@ -138,6 +138,7 @@ class Command
     typedef std::pair<std::string, CValuePtr> ArgumentItem;
     typedef std::vector<ArgumentItem> Arguments;
     typedef std::vector<int> CompressionParams;
+    typedef std::function<void(const CommandResult& r)> EventCallback;
 
     /// Command type
     enum class Type
@@ -184,12 +185,18 @@ class Command
         : std::string(boost::algorithm::trim_left_copy_if(path, boost::algorithm::is_any_of(PATH_DELIMS)));
     }
 
+    virtual inline void setEventCallback(const EventCallback& cb) noexcept {m_event_callback = cb;};
+
+  protected:
+    virtual void invokeEventCallback(const std::string& message) const noexcept;
+
   protected:
     /// Format-specific save parameters for `cv::imwrite()`.
     static CompressionParams s_compression_params;
     /// Whether to allow absolute path processing
     bool m_allow_absolute_paths = true;
     const char* PATH_DELIMS = " \t\r\n/";
+    EventCallback m_event_callback{nullptr};
 };
 
 

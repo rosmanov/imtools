@@ -112,7 +112,9 @@ write(Level level, const char* format, ...) noexcept
 
     buf[len++] = '\n';
 
-    ::write(level < Level::WARNING ? STDOUT_FILENO : STDERR_FILENO, buf, len);
+    if (::write(level < Level::WARNING ? STDOUT_FILENO : STDERR_FILENO, buf, len) == -1) {
+      fprintf(stderr, "write: %s\n", strerror(errno));
+    }
   }
 }
 
