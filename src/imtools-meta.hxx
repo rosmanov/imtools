@@ -23,7 +23,7 @@
 # define _GNU_SOURCE
 #endif
 
-#define IMTOOLS_VERSION "2.0.0-dev"
+#define IMTOOLS_VERSION "2.0.1-dev"
 
 
 #ifdef IMTOOLS_DEBUG
