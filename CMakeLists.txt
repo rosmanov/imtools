@@ -105,7 +105,7 @@ foreach(exec_item IN ITEMS ${imtools_targets})
   set(src_api src/${exec_item}-api.cxx)
   set(src src/${exec_item}.cxx ${common_src})
 
-  if (EXISTS ${src_api})
+  if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src_api})
     list(APPEND src ${src_api} src/Command.cxx)
     list(APPEND src_api_list ${src_api})
   endif (EXISTS ${src_api})
