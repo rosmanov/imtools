@@ -220,7 +220,8 @@ MergeCommand::run(imtools::CommandResult& result)
   m_old_img = cv::imread(m_old_image_filename, 1);
   m_new_img = cv::imread(m_new_image_filename, 1);
   if (m_old_img.size() != m_new_img.size()) {
-    throw ErrorException("Input images have different dimensions");
+    throw ErrorException("Input images have different dimensions, old: %dx%d, new: %dx%d",
+        m_old_img.cols, m_old_img.rows, m_new_img.cols, m_new_img.rows);
   }
   if (m_old_img.type() != m_new_img.type()) {
     throw ErrorException("Input images have different types");
